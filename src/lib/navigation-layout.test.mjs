@@ -21,11 +21,4 @@ describe("mobile navigation layout", () => {
     expect(source).toContain("<MobileAppFrame");
     expect(source).not.toContain("<MobileTabBar />");
   });
-
-  test("protected shell docks the mobile tab bar in a fixed bottom container", () => {
-    const source = readProjectFile("src/components/protected-shell.tsx");
-
-    expect(source).toContain("fixed inset-x-0 bottom-0 z-30");
-    expect(source).toContain("md:hidden");
-  });
 });

@@ -408,7 +408,7 @@ function EmptyCartState() {
       </p>
 
       <Link
-        href={appRoutes.catalog}
+        href={appRoutes.home}
         className="mt-4 inline-flex h-[34px] items-center justify-center rounded-full bg-[#1688ff] px-[14px] text-[15px] leading-5 tracking-[-0.23px] text-white visited:!text-white hover:!text-white focus:!text-white active:!text-white no-underline"
       >
         Перейти к товарам
