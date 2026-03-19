@@ -90,6 +90,32 @@ function clampQuantity(quantity: number, max: number) {
   return Math.max(0, Math.min(quantity, max));
 }
 
+function normalizeCartSnapshotItem(item: CartSnapshotItem): CartSnapshotItem {
+  return {
+    ...item,
+    imageUrl: normalizeAssetSource(item.imageUrl),
+  };
+}
+
+export function normalizePersistedState(persisted: PersistedState): PersistedState {
+  return {
+    session: persisted.session,
+    ...(persisted.recentOrders
+      ? {
+          recentOrders: persisted.recentOrders.map((order) => ({
+            ...order,
+            items: order.items.map((item) => ({
+              ...item,
+              imageUrl: normalizeAssetSource(item.imageUrl),
+            })),
+          })),
+        }
+      : {}),
+    cart: (persisted.cart ?? []).map(normalizeCartSnapshotItem),
+    orderDraft: persisted.orderDraft,
+  };
+}
+
 function readPersistedState(): PersistedState | null {
   if (typeof window === "undefined") {
     return null;
@@ -101,7 +127,7 @@ function readPersistedState(): PersistedState | null {
   }
 
   try {
-    return JSON.parse(raw) as PersistedState;
+    return normalizePersistedState(JSON.parse(raw) as PersistedState);
   } catch {
     return null;
   }

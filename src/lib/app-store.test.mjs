@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createClearedPersistedState,
   createCompletedOrderPersistedState,
+  normalizePersistedState,
   writePersistedState,
 } from "./app-store.tsx";
 
@@ -265,6 +266,46 @@ describe("writePersistedState", () => {
       orderDraft: {
         orderedByFullName: "Иван Иванов",
         comments: "Доставить утром",
+      },
+    });
+  });
+});
+
+describe("normalizePersistedState", () => {
+  test("normalizes legacy cart image urls when restoring persisted state", () => {
+    const persisted = normalizePersistedState({
+      session: null,
+      cart: [
+        {
+          productId: "product-1",
+          productName: "Филе",
+          imageUrl: "/products/IMG_0327.JPG",
+          quantity: 2,
+          quantityAvailable: 10,
+          available: true,
+        },
+      ],
+      orderDraft: {
+        orderedByFullName: "Иван Иванов",
+        comments: "",
+      },
+    });
+
+    expect(persisted).toEqual({
+      session: null,
+      cart: [
+        {
+          productId: "product-1",
+          productName: "Филе",
+          imageUrl: "/static/products/IMG_0327.webp",
+          quantity: 2,
+          quantityAvailable: 10,
+          available: true,
+        },
+      ],
+      orderDraft: {
+        orderedByFullName: "Иван Иванов",
+        comments: "",
       },
     });
   });

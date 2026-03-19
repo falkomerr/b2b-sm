@@ -3,7 +3,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/button";
 import { getOrderDetailsRoute } from "@/lib/app-routes";
-import { createOrder, validateCart, type CartSnapshotItem } from "@/lib/api";
+import {
+  createOrder,
+  resolveAssetUrl,
+  validateCart,
+  type CartSnapshotItem,
+} from "@/lib/api";
 import { useAppStore } from "@/lib/app-store";
 import {
   createOrderAddressDraft,
@@ -209,12 +214,14 @@ function CartRow({
   onIncrement: () => void;
   onDecrement: () => void;
 }) {
+  const imageUrl = resolveAssetUrl(item.imageUrl);
+
   return (
     <div className="rounded-[1.5rem] bg-[var(--surface-muted)] p-4">
       <div className="flex items-center gap-3">
-        {item.imageUrl ? (
+        {imageUrl ? (
           <Image
-            src={item.imageUrl}
+            src={imageUrl}
             alt={item.productName}
             width={64}
             height={64}
