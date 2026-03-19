@@ -48,7 +48,7 @@ export default function HomePage() {
           return;
         }
 
-        setProducts(selectHomeProducts(loadedProducts, loadedProducts.length));
+        setProducts(selectHomeProducts(loadedProducts));
       })
       .catch((loadError) => {
         if (!active) {
@@ -185,7 +185,7 @@ function HomeProductCard({
             alt={product.name}
             width={112}
             height={112}
-            unoptimized
+            sizes="(max-width: 640px) 100px, 112px"
             className="h-[100px] w-[100px] object-contain"
           />
         ) : (

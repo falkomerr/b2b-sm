@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState, type ReactNode } from "react";
 import { MobileAppFrame } from "@/components/mobile-app-frame";
 import { appRoutes } from "@/lib/app-routes";
 import { getOrders, resolveAssetUrl, type Order } from "@/lib/api";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/profile-presentation";
 
 const orderItemFallbackSrc = "/assets/profile/order-item-fish-2ab092.png";
+const supportPhoneHref = "tel:+996705275206";
 
 export default function OrderDetailsPage() {
   const params = useParams<{ orderId: string }>();
@@ -210,33 +211,48 @@ function OrderOverviewCard({
 
       <div className="mx-2 mt-3 h-px bg-[#e6e6e6]" />
 
-      <div className="mt-3 flex justify-center">
-        <button
-          type="button"
-          onClick={onRepeat}
-          className="flex flex-col items-center gap-1.5"
-        >
-            <span className="inline-flex size-11 items-center justify-center rounded-full bg-[rgba(118,118,128,0.12)] p-2 text-[#1688ff]">
-            <svg
-              aria-hidden="true"
-              className="size-7"
-              fill="none"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-                <path
-                  d="M21 12a8.5 8.5 0 1 1-2.17-5.7M17.83 4.5L21.5 8.2H17.83"
-                  stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-          <span className="font-['SF_Pro:Regular',sans-serif] text-[12px] leading-4 font-normal text-[#8e8e93]">
-            Повторить
-          </span>
-        </button>
+      <div className="mt-3 flex justify-center gap-6">
+        <OrderActionButton label="Повторить" onClick={onRepeat}>
+          <svg
+            aria-hidden="true"
+            className="size-7"
+            fill="none"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M21 12a8.5 8.5 0 1 1-2.17-5.7M17.83 4.5L21.5 8.2H17.83"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </OrderActionButton>
+
+        <OrderActionButton href={supportPhoneHref} label="Поддержка">
+          <svg
+            aria-hidden="true"
+            className="size-7"
+            fill="none"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M7 8.75A2.75 2.75 0 0 1 9.75 6h4.5A2.75 2.75 0 0 1 17 8.75v4.5A2.75 2.75 0 0 1 14.25 16H12l-3.4 2.55A.75.75 0 0 1 7.4 18V16A2.75 2.75 0 0 1 7 13.25v-4.5Z"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M10.25 10.25h3.5M10.25 13.25h2"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+            />
+          </svg>
+        </OrderActionButton>
       </div>
     </section>
   );
@@ -278,7 +294,7 @@ function OrderItemRow({
             src={imageUrl}
             alt={item.productName}
             fill
-            unoptimized
+            sizes="35px"
             className="object-cover"
           />
         </div>
@@ -302,5 +318,43 @@ function OrderItemRow({
         </p>
       </div>
     </div>
+  );
+}
+
+function OrderActionButton({
+  children,
+  href,
+  label,
+  onClick,
+}: {
+  children: ReactNode;
+  href?: string;
+  label: string;
+  onClick?: () => void;
+}) {
+  const className = "flex flex-col items-center gap-1.5 text-[#1688ff]";
+  const content = (
+    <>
+      <span className="inline-flex size-11 items-center justify-center rounded-full bg-[rgba(118,118,128,0.12)] p-2">
+        {children}
+      </span>
+      <span className="font-['SF_Pro:Regular',sans-serif] text-[12px] leading-4 font-normal text-[#8e8e93]">
+        {label}
+      </span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a className={className} href={href}>
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {content}
+    </button>
   );
 }

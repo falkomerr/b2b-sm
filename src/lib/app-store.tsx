@@ -16,10 +16,14 @@ import {
   getCurrentUser,
   loginB2B as loginB2BRequest,
   logout as logoutRequest,
-  resolveAssetUrl,
+  normalizeAssetSource,
   updateCurrentUser as updateCurrentUserRequest,
 } from "@/lib/api";
-import { createOrderAddressDraft, type OrderAddressDraft } from "@/lib/order-draft";
+import {
+  createOrderAddressDraft,
+  toOrderAddressPayload,
+  type OrderAddressDraft,
+} from "@/lib/order-draft";
 
 type OrderDraft = {
   orderedByFullName: string;
@@ -49,7 +53,11 @@ type AppStoreValue = {
   completeOrder: (order: Order) => void;
   clearCart: () => void;
   updateDraft: (patch: Partial<OrderDraft>) => void;
-  saveProfile: (patch: { name?: string; phone?: string }) => Promise<CurrentUser>;
+  saveProfile: (patch: {
+    name?: string;
+    phone?: string;
+    address?: OrderAddressDraft | null;
+  }) => Promise<CurrentUser>;
 };
 
 type StoreSnapshot = {
@@ -242,6 +250,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               ...current,
               orderedByFullName:
                 current.orderedByFullName || user.name || current.orderedByFullName,
+              address: user.address ? createOrderAddressDraft(user.address) : undefined,
             }));
           })
           .catch(() => {
@@ -288,6 +297,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setOrderDraft((current) => ({
         ...current,
         orderedByFullName: current.orderedByFullName || user.name || "",
+        address: user.address ? createOrderAddressDraft(user.address) : undefined,
       }));
 
       return auth;
@@ -316,6 +326,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const user = await updateCurrentUserRequest(session.accessToken, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.phone !== undefined ? { phone: patch.phone } : {}),
+        ...(patch.address !== undefined
+          ? {
+              address: patch.address ? toOrderAddressPayload(patch.address) ?? null : null,
+            }
+          : {}),
       });
 
       setSession({
@@ -325,6 +340,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setOrderDraft((current) => ({
         ...current,
         orderedByFullName: user.name ?? "",
+        address: user.address ? createOrderAddressDraft(user.address) : undefined,
       }));
 
       return user;
@@ -339,7 +355,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             {
               productId: product.id,
               productName: product.name,
-              imageUrl: resolveAssetUrl(product.picture),
+              imageUrl: normalizeAssetSource(product.picture),
               categoryName: product.category?.name,
               quantity: product.available ? 1 : 0,
               quantityAvailable: product.quantity,
@@ -396,7 +412,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         order.items.map((item) => ({
           productId: item.productId,
           productName: item.productName,
-          imageUrl: resolveAssetUrl(item.imageUrl),
+          imageUrl: normalizeAssetSource(item.imageUrl),
           quantity: item.quantity,
           quantityAvailable: item.quantity,
           available: true,
@@ -406,11 +422,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         ...current,
         orderedByFullName: order.orderedByFullName ?? current.orderedByFullName,
         comments: order.comments ?? "",
-        ...(order.address
-          ? {
-              address: createOrderAddressDraft(order.address),
-            }
-          : {}),
       }));
     },
     rememberOrder(order) {

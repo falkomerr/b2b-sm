@@ -9,6 +9,7 @@ export type CurrentUser = {
   name?: string;
   username?: string;
   companyName?: string;
+  address?: OrderAddress | null;
   accountType: AccountType;
 };
 
@@ -104,6 +105,7 @@ const PRODUCTION_API_BASE_URL = "https://land.smartforel.com/api";
 const PUBLIC_API_PROXY_PATH = "/backend-api";
 const PUBLIC_ASSET_PROXY_PATH = "/backend-assets";
 const ALLOWED_ASSET_PROTOCOLS = new Set(["http:", "https:", "data:", "blob:"]);
+const LEGACY_PRODUCT_ASSET_PATTERN = /^\/?(?:static\/)?products\/([^/?#]+)$/i;
 
 type ApiRuntimeOptions = {
   configuredApiBaseUrl?: string | null;
@@ -193,6 +195,17 @@ function resolveAssetBaseUrl({
   return resolveDirectBackendOrigin({ configuredApiBaseUrl, browserHost, browserOrigin });
 }
 
+function normalizeLegacyProductAssetPath(pathname: string) {
+  const match = pathname.match(LEGACY_PRODUCT_ASSET_PATTERN);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const baseName = decodeURIComponent(match[1]).replace(/\.[^.]+$/, "");
+  return `/static/products/${baseName}.webp`;
+}
+
 function joinBaseUrl(baseUrl: string, path: string) {
   const normalizedPath = path.replace(/^\/+/, "");
 
@@ -232,11 +245,7 @@ export function resolveAssetUrl(
   source?: string | null,
   options?: ApiRuntimeOptions,
 ) {
-  if (!source) {
-    return undefined;
-  }
-
-  const normalizedSource = source.trim();
+  const normalizedSource = normalizeAssetSource(source);
 
   if (!normalizedSource) {
     return undefined;
@@ -268,6 +277,34 @@ export function resolveAssetUrl(
   } catch {
     return undefined;
   }
+}
+
+export function normalizeAssetSource(source?: string | null) {
+  if (!source) {
+    return undefined;
+  }
+
+  const trimmedSource = source.trim();
+
+  if (!trimmedSource) {
+    return undefined;
+  }
+
+  try {
+    const absoluteUrl = new URL(trimmedSource);
+
+    if (!ALLOWED_ASSET_PROTOCOLS.has(absoluteUrl.protocol)) {
+      return undefined;
+    }
+
+    if (absoluteUrl.protocol === "data:" || absoluteUrl.protocol === "blob:") {
+      return absoluteUrl.toString();
+    }
+
+    return normalizeLegacyProductAssetPath(absoluteUrl.pathname) ?? absoluteUrl.toString();
+  } catch {}
+
+  return normalizeLegacyProductAssetPath(trimmedSource) ?? trimmedSource;
 }
 
 function extractErrorMessage(payload: unknown, fallback: string) {
@@ -336,6 +373,7 @@ function mapCurrentUser(payload: CurrentUserPayload): CurrentUser {
     name: payload.name,
     username: payload.username,
     companyName: payload.companyName,
+    address: payload.address,
     accountType: payload.accountType,
   };
 }
@@ -372,6 +410,7 @@ export async function updateCurrentUser(
   payload: {
     name?: string;
     phone?: string;
+    address?: OrderAddress | null;
   },
 ) {
   return request<CurrentUserPayload>(

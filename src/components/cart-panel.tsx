@@ -25,7 +25,7 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
   } = useAppStore();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const orderAddress = createOrderAddressDraft(orderDraft.address);
+  const orderAddress = createOrderAddressDraft(session?.user.address);
 
   async function handleSubmit() {
     if (!session) {
@@ -43,7 +43,7 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
     }
 
     if (!hasRequiredOrderAddress(orderAddress)) {
-      setError("Укажите адрес доставки.");
+      setError("Укажите адрес доставки в настройках профиля.");
       return;
     }
 
@@ -150,94 +150,10 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
 
       <div className="space-y-3">
         <p className="text-sm font-semibold">Адрес доставки</p>
-
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Город</span>
-          <input
-            value={orderAddress.city}
-            onChange={(event) =>
-              updateDraft({
-                address: {
-                  ...orderAddress,
-                  city: event.target.value,
-                },
-              })
-            }
-            placeholder="Например, Бишкек"
-            className="input"
-          />
-        </label>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Улица</span>
-            <input
-              value={orderAddress.street}
-              onChange={(event) =>
-                updateDraft({
-                  address: {
-                    ...orderAddress,
-                    street: event.target.value,
-                  },
-                })
-              }
-              placeholder="Например, Манаса"
-              className="input"
-            />
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Дом</span>
-            <input
-              value={orderAddress.building}
-              onChange={(event) =>
-                updateDraft({
-                  address: {
-                    ...orderAddress,
-                    building: event.target.value,
-                  },
-                })
-              }
-              placeholder="Например, 50"
-              className="input"
-            />
-          </label>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Квартира</span>
-            <input
-              value={orderAddress.apartment}
-              onChange={(event) =>
-                updateDraft({
-                  address: {
-                    ...orderAddress,
-                    apartment: event.target.value,
-                  },
-                })
-              }
-              placeholder="Опционально"
-              className="input"
-            />
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Этаж</span>
-            <input
-              value={orderAddress.floor}
-              onChange={(event) =>
-                updateDraft({
-                  address: {
-                    ...orderAddress,
-                    floor: event.target.value,
-                  },
-                })
-              }
-              placeholder="Опционально"
-              className="input"
-            />
-          </label>
+        <div className="rounded-[1.5rem] border border-[var(--border)] bg-white px-4 py-4 text-sm leading-6 text-[var(--muted)]">
+          {hasRequiredOrderAddress(orderAddress)
+            ? formatAddressPreview(orderAddress)
+            : "Адрес доставки указывается в настройках профиля."}
         </div>
       </div>
 
@@ -273,6 +189,17 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
   );
 }
 
+function formatAddressPreview(address: ReturnType<typeof createOrderAddressDraft>) {
+  return [
+    address.city.trim(),
+    `${address.street.trim()} ${address.building.trim()}`.trim(),
+    address.apartment.trim() ? `кв. ${address.apartment.trim()}` : "",
+    address.floor.trim() ? `этаж ${address.floor.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 function CartRow({
   item,
   onIncrement,
@@ -291,7 +218,7 @@ function CartRow({
             alt={item.productName}
             width={64}
             height={64}
-            unoptimized
+            sizes="64px"
             className="h-16 w-16 rounded-2xl object-cover"
           />
         ) : (

@@ -61,7 +61,7 @@ export default function CartPage() {
   }, [cart]);
 
   const hasItems = cart.length > 0;
-  const orderAddress = createOrderAddressDraft(orderDraft.address);
+  const deliveryAddress = createOrderAddressDraft(session?.user.address);
   const selectionCopy = getSelectionCopy({
     totalCount: cart.length,
     selectedCount: selectedProductIds.length,
@@ -82,8 +82,8 @@ export default function CartPage() {
       return;
     }
 
-    if (!hasRequiredOrderAddress(orderAddress)) {
-      setError("Укажите адрес доставки.");
+    if (!hasRequiredOrderAddress(deliveryAddress)) {
+      setError("Укажите адрес доставки в настройках профиля.");
       return;
     }
 
@@ -110,7 +110,7 @@ export default function CartPage() {
           })),
           orderedByFullName: orderDraft.orderedByFullName.trim(),
           comments: orderDraft.comments.trim() || undefined,
-          address: toOrderAddressPayload(orderAddress),
+          address: toOrderAddressPayload(deliveryAddress),
         },
         session.accessToken,
       );
@@ -252,105 +252,30 @@ export default function CartPage() {
               Заказ оформляется по всем позициям, которые сейчас лежат в корзине.
             </p>
 
-            <div className="mt-4 grid gap-3">
-              <label className="block">
-                <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                  Город
-                </span>
-                <input
-                  value={orderAddress.city}
-                  onChange={(event) =>
-                    updateDraft({
-                      address: {
-                        ...orderAddress,
-                        city: event.target.value,
-                      },
-                    })
-                  }
-                  placeholder="Например, Бишкек"
-                  className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                />
-              </label>
+            <div className="mt-4 rounded-[22px] border border-[#ececf2] bg-white px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
+                    Адрес доставки
+                  </p>
+                  <p className="mt-1 text-[12px] leading-4 tracking-[-0.08px] text-[#8e8e93]">
+                    Адрес берется из настроек профиля и больше не заполняется при оформлении заказа.
+                  </p>
+                </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                    Улица
-                  </span>
-                  <input
-                    value={orderAddress.street}
-                    onChange={(event) =>
-                      updateDraft({
-                        address: {
-                          ...orderAddress,
-                          street: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder="Например, Манаса"
-                    className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                    Дом
-                  </span>
-                  <input
-                    value={orderAddress.building}
-                    onChange={(event) =>
-                      updateDraft({
-                        address: {
-                          ...orderAddress,
-                          building: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder="Например, 50"
-                    className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                  />
-                </label>
+                <Link
+                  href={appRoutes.account}
+                  className="inline-flex h-9 shrink-0 items-center justify-center rounded-full bg-[#eef5ff] px-4 text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1688ff]"
+                >
+                  Настроить
+                </Link>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                    Квартира
-                  </span>
-                  <input
-                    value={orderAddress.apartment}
-                    onChange={(event) =>
-                      updateDraft({
-                        address: {
-                          ...orderAddress,
-                          apartment: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder="Опционально"
-                    className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                    Этаж
-                  </span>
-                  <input
-                    value={orderAddress.floor}
-                    onChange={(event) =>
-                      updateDraft({
-                        address: {
-                          ...orderAddress,
-                          floor: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder="Опционально"
-                    className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                  />
-                </label>
-              </div>
+              <p className="mt-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212]">
+                {hasRequiredOrderAddress(deliveryAddress)
+                  ? formatAddressPreview(deliveryAddress)
+                  : "Адрес пока не указан. Заполните его в настройках профиля."}
+              </p>
             </div>
 
             <label className="mt-4 block">
@@ -451,7 +376,7 @@ function CartItemCard({
               alt={item.productName}
               width={78}
               height={78}
-              unoptimized
+              sizes="72px"
               className="h-[72px] w-[72px] object-contain drop-shadow-[0_10px_12px_rgba(15,23,42,0.16)]"
             />
           ) : (
@@ -588,4 +513,15 @@ function SelectionCheckbox({ checked }: { checked: boolean }) {
       </svg>
     </span>
   );
+}
+
+function formatAddressPreview(address: ReturnType<typeof createOrderAddressDraft>) {
+  return [
+    address.city.trim(),
+    `${address.street.trim()} ${address.building.trim()}`.trim(),
+    address.apartment.trim() ? `кв. ${address.apartment.trim()}` : "",
+    address.floor.trim() ? `этаж ${address.floor.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
 }

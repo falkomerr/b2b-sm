@@ -18,4 +18,28 @@ describe("next.config", () => {
       },
     ]);
   });
+
+  test("allows optimizing backend-hosted product images", () => {
+    expect(nextConfig.images).toEqual({
+      remotePatterns: [
+        {
+          protocol: "https",
+          hostname: "land.smartforel.com",
+          pathname: "/**",
+        },
+        {
+          protocol: "http",
+          hostname: "localhost",
+          port: "3001",
+          pathname: "/**",
+        },
+        {
+          protocol: "http",
+          hostname: "127.0.0.1",
+          port: "3001",
+          pathname: "/**",
+        },
+      ],
+    });
+  });
 });
