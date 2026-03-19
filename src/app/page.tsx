@@ -48,7 +48,7 @@ export default function HomePage() {
           return;
         }
 
-        setProducts(selectHomeProducts(loadedProducts));
+        setProducts(selectHomeProducts(loadedProducts, loadedProducts.length));
       })
       .catch((loadError) => {
         if (!active) {

@@ -52,11 +52,19 @@ describe("resolveApiBaseUrl", () => {
 });
 
 describe("resolveAssetUrl on public hosts", () => {
-  test("resolves relative asset paths against production backend", () => {
+  test("resolves relative asset paths through same-origin asset proxy", () => {
     expect(
       resolveAssetUrl("/products/item.jpg", {
         browserHost: "b2b.smartforel.com",
       }),
-    ).toBe("https://land.smartforel.com/products/item.jpg");
+    ).toBe("/backend-assets/products/item.jpg");
+  });
+
+  test("proxies absolute backend asset URLs on public hosts", () => {
+    expect(
+      resolveAssetUrl("https://land.smartforel.com/products/item.jpg", {
+        browserHost: "b2b.smartforel.com",
+      }),
+    ).toBe("/backend-assets/products/item.jpg");
   });
 });

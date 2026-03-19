@@ -12,6 +12,10 @@ describe("next.config", () => {
         source: "/backend-api/:path*",
         destination: "https://land.smartforel.com/api/:path*",
       },
+      {
+        source: "/backend-assets/:path*",
+        destination: "https://land.smartforel.com/:path*",
+      },
     ]);
   });
 });

@@ -102,6 +102,7 @@ type CurrentUserPayload = Omit<CurrentUser, "userId"> & {
 const LOCAL_API_BASE_URL = "http://localhost:3001/api";
 const PRODUCTION_API_BASE_URL = "https://land.smartforel.com/api";
 const PUBLIC_API_PROXY_PATH = "/backend-api";
+const PUBLIC_ASSET_PROXY_PATH = "/backend-assets";
 const ALLOWED_ASSET_PROTOCOLS = new Set(["http:", "https:", "data:", "blob:"]);
 
 type ApiRuntimeOptions = {
@@ -144,7 +145,7 @@ export function resolveApiBaseUrl({
   return LOCAL_API_BASE_URL;
 }
 
-function resolveBackendOrigin({
+function resolveDirectBackendOrigin({
   configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
   browserHost = getBrowserLocation()?.hostname,
   browserOrigin = getBrowserLocation()?.origin,
@@ -166,6 +167,44 @@ function resolveBackendOrigin({
   }
 
   return new URL(LOCAL_API_BASE_URL).origin;
+}
+
+function resolveAssetBaseUrl({
+  configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
+  browserHost = getBrowserLocation()?.hostname,
+  browserOrigin = getBrowserLocation()?.origin,
+}: ApiRuntimeOptions = {}) {
+  if (!isLocalBrowserHost(browserHost)) {
+    return PUBLIC_ASSET_PROXY_PATH;
+  }
+
+  const normalizedApiBaseUrl = configuredApiBaseUrl?.trim();
+
+  if (normalizedApiBaseUrl) {
+    try {
+      return new URL(normalizedApiBaseUrl).origin;
+    } catch {
+      if (browserOrigin) {
+        return new URL(normalizedApiBaseUrl, `${browserOrigin}/`).origin;
+      }
+    }
+  }
+
+  return resolveDirectBackendOrigin({ configuredApiBaseUrl, browserHost, browserOrigin });
+}
+
+function joinBaseUrl(baseUrl: string, path: string) {
+  const normalizedPath = path.replace(/^\/+/, "");
+
+  try {
+    return new URL(normalizedPath, `${baseUrl.replace(/\/+$/, "")}/`).toString();
+  } catch {
+    return `${baseUrl.replace(/\/+$/, "")}/${normalizedPath}`;
+  }
+}
+
+function toPublicAssetProxyPath(pathname: string, search = "", hash = "") {
+  return joinBaseUrl(PUBLIC_ASSET_PROXY_PATH, pathname) + search + hash;
 }
 
 function resolveApiUrl(
@@ -207,6 +246,17 @@ export function resolveAssetUrl(
     const absoluteUrl = new URL(normalizedSource);
 
     if (ALLOWED_ASSET_PROTOCOLS.has(absoluteUrl.protocol)) {
+      if (
+        !isLocalBrowserHost(options?.browserHost ?? getBrowserLocation()?.hostname)
+        && absoluteUrl.origin === resolveDirectBackendOrigin(options)
+      ) {
+        return toPublicAssetProxyPath(
+          absoluteUrl.pathname,
+          absoluteUrl.search,
+          absoluteUrl.hash,
+        );
+      }
+
       return absoluteUrl.toString();
     }
 
@@ -214,7 +264,7 @@ export function resolveAssetUrl(
   } catch {}
 
   try {
-    return new URL(normalizedSource, `${resolveBackendOrigin(options)}/`).toString();
+    return joinBaseUrl(resolveAssetBaseUrl(options), normalizedSource);
   } catch {
     return undefined;
   }
