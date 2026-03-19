@@ -61,6 +61,7 @@ export default function CartPage() {
   }, [cart]);
 
   const hasItems = cart.length > 0;
+  const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const deliveryAddress = createOrderAddressDraft(session?.user.address);
   const selectionCopy = getSelectionCopy({
     totalCount: cart.length,
@@ -173,16 +174,6 @@ export default function CartPage() {
 
   return (
     <MobileAppFrame
-      footer={
-        hasItems ? (
-          <CartFooter
-            error={error}
-            isSubmitting={isSubmitting}
-            itemCount={cart.reduce((total, item) => total + item.quantity, 0)}
-            onSubmit={handleSubmit}
-          />
-        ) : undefined
-      }
       tabBarFixed
       mainClassName={!hasItems ? "!pt-0 min-h-screen" : ""}
     >
@@ -304,6 +295,14 @@ export default function CartPage() {
               />
             </label>
           </section>
+
+          <CartFooter
+            inline
+            error={error}
+            isSubmitting={isSubmitting}
+            itemCount={itemCount}
+            onSubmit={handleSubmit}
+          />
         </div>
       ) : (
         <EmptyCartState />
@@ -420,17 +419,26 @@ function CartItemCard({
 
 function CartFooter({
   error,
+  inline = false,
   isSubmitting,
   itemCount,
   onSubmit,
 }: {
   error: string | null;
+  inline?: boolean;
   isSubmitting: boolean;
   itemCount: number;
   onSubmit: () => void;
 }) {
   return (
-    <div className="border-t border-[#f0f1f5] bg-white px-4 pb-4 pt-3 shadow-[0_-14px_34px_rgba(15,23,42,0.08)]">
+    <div
+      className={[
+        "bg-white px-4 pb-4 pt-3",
+        inline
+          ? "mt-4 rounded-[28px] border border-[#f0f1f5] shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+          : "border-t border-[#f0f1f5] shadow-[0_-14px_34px_rgba(15,23,42,0.08)]",
+      ].join(" ")}
+    >
       <div className="mb-2 flex items-center justify-between text-[12px] leading-4 text-[#8e8e93]">
         <span>К оформлению</span>
         <span>{itemCount} поз.</span>
