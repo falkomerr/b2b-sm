@@ -17,7 +17,7 @@ export function MobileAppFrame({
   footer,
   mainClassName = "",
   showTabBar = true,
-  tabBarFixed = false,
+  tabBarFixed = true,
 }: MobileAppFrameProps) {
   const hasFixedFooter = Boolean(footer);
   const hasFixedTabBar = Boolean(showTabBar && tabBarFixed);

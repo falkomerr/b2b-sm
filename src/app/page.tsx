@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MobileTabBar } from "@/components/mobile-tab-bar";
+import { MobileAppFrame } from "@/components/mobile-app-frame";
 import { appRoutes } from "@/lib/app-routes";
 import { getProducts, resolveAssetUrl, type Product } from "@/lib/api";
 import { useAppStore } from "@/lib/app-store";
@@ -91,51 +91,43 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7]" style={{ fontFamily }}>
-      <div className="mx-auto flex min-h-screen w-full max-w-[392px] flex-col bg-white sm:my-5 sm:min-h-[852px] sm:overflow-hidden sm:rounded-[44px] sm:shadow-[0_28px_90px_rgba(18,18,18,0.14)]">
-        <main className="flex-1 overflow-y-auto px-3 pb-6 pt-5">
-          <NoticeCard />
+    <MobileAppFrame mainClassName="px-3 pt-5">
+      <NoticeCard />
 
-          <section className="mt-4">
-            {loading ? (
-              <div className="grid grid-cols-2 gap-4">
-                {Array.from({ length: 4 }, (_, index) => (
-                  <HomeProductCardSkeleton key={`home-skeleton-${index}`} />
-                ))}
-              </div>
-            ) : error ? (
-              <div className="rounded-[26px] bg-[#fff3f3] px-4 py-5 text-[13px] leading-[18px] text-[#bf4d4d]">
-                {error}
-              </div>
-            ) : products.length ? (
-              <div className="grid grid-cols-2 gap-4">
-                {products.map((product) => {
-                  const quantityInCart =
-                    cart.find((item) => item.productId === product.id)?.quantity ?? 0;
+      <section className="mt-4">
+        {loading ? (
+          <div className="grid grid-cols-2 gap-4">
+            {Array.from({ length: 4 }, (_, index) => (
+              <HomeProductCardSkeleton key={`home-skeleton-${index}`} />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="rounded-[26px] bg-[#fff3f3] px-4 py-5 text-[13px] leading-[18px] text-[#bf4d4d]">
+            {error}
+          </div>
+        ) : products.length ? (
+          <div className="grid grid-cols-2 gap-4">
+            {products.map((product) => {
+              const quantityInCart =
+                cart.find((item) => item.productId === product.id)?.quantity ?? 0;
 
-                  return (
-                    <HomeProductCard
-                      key={product.id}
-                      product={product}
-                      quantityInCart={quantityInCart}
-                      onAdd={() => addProduct(product)}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="rounded-[26px] bg-[#f4f4fb] px-4 py-5 text-[13px] leading-[18px] text-[#7f8089]">
-                Товары для главной страницы пока недоступны.
-              </div>
-            )}
-          </section>
-        </main>
-
-        <div className="flex justify-center pb-0 pt-3">
-          <MobileTabBar />
-        </div>
-      </div>
-    </div>
+              return (
+                <HomeProductCard
+                  key={product.id}
+                  product={product}
+                  quantityInCart={quantityInCart}
+                  onAdd={() => addProduct(product)}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-[26px] bg-[#f4f4fb] px-4 py-5 text-[13px] leading-[18px] text-[#7f8089]">
+            Товары для главной страницы пока недоступны.
+          </div>
+        )}
+      </section>
+    </MobileAppFrame>
   );
 }
 

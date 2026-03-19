@@ -70,7 +70,7 @@ export function ProtectedShell({
         </div>
       </header>
 
-      <main className="mx-auto flex-1 max-w-7xl px-4 py-8 md:px-6">
+      <main className="mx-auto flex-1 max-w-7xl px-4 pt-8 pb-28 md:px-6 md:pb-8">
         <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[var(--primary)]">
@@ -85,7 +85,13 @@ export function ProtectedShell({
         {children}
       </main>
 
-      <div className="bg-white pb-6 pt-2 md:bg-transparent md:px-4">
+      <div className="fixed inset-x-0 bottom-0 z-30 flex w-full flex-col items-center pb-2 pt-3 md:hidden">
+        <div className="w-full max-w-[392px]">
+          <MobileTabBar />
+        </div>
+      </div>
+
+      <div className="hidden pb-6 pt-2 md:block md:px-4">
         <div className="flex justify-center">
           <MobileTabBar />
         </div>

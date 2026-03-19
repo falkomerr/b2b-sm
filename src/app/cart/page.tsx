@@ -183,7 +183,7 @@ export default function CartPage() {
           />
         ) : undefined
       }
-      tabBarFixed={!hasItems}
+      tabBarFixed
       mainClassName={!hasItems ? "!pt-0 min-h-screen" : ""}
     >
       {hasItems ? (

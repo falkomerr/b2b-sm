@@ -310,7 +310,7 @@ function SegmentedControl({
             : "font-medium text-[#121212]",
         ].join(" ")}
       >
-        История заказов
+        История
       </button>
     </div>
   );
