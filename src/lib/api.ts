@@ -99,23 +99,100 @@ type CurrentUserPayload = Omit<CurrentUser, "userId"> & {
   id?: string;
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
+const LOCAL_API_BASE_URL = "http://localhost:3001/api";
+const PRODUCTION_API_BASE_URL = "https://land.smartforel.com/api";
+const PUBLIC_API_PROXY_PATH = "/backend-api";
 const ALLOWED_ASSET_PROTOCOLS = new Set(["http:", "https:", "data:", "blob:"]);
 
-function getBackendOrigin() {
-  return new URL(API_BASE_URL).origin;
-}
+type ApiRuntimeOptions = {
+  configuredApiBaseUrl?: string | null;
+  browserHost?: string;
+  browserOrigin?: string;
+};
 
-function resolveApiUrl(path: string, params?: URLSearchParams) {
-  const url = new URL(path, `${API_BASE_URL}/`);
-  if (params) {
-    url.search = params.toString();
+function getBrowserLocation() {
+  if (typeof window === "undefined") {
+    return undefined;
   }
-  return url.toString();
+
+  return window.location;
 }
 
-export function resolveAssetUrl(source?: string | null) {
+function isLocalBrowserHost(browserHost?: string) {
+  return (
+    !browserHost ||
+    browserHost === "localhost" ||
+    browserHost === "127.0.0.1" ||
+    browserHost === "::1"
+  );
+}
+
+export function resolveApiBaseUrl({
+  configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
+  browserHost = getBrowserLocation()?.hostname,
+}: ApiRuntimeOptions = {}) {
+  const normalizedApiBaseUrl = configuredApiBaseUrl?.trim();
+
+  if (normalizedApiBaseUrl) {
+    return normalizedApiBaseUrl;
+  }
+
+  if (!isLocalBrowserHost(browserHost)) {
+    return PUBLIC_API_PROXY_PATH;
+  }
+
+  return LOCAL_API_BASE_URL;
+}
+
+function resolveBackendOrigin({
+  configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
+  browserHost = getBrowserLocation()?.hostname,
+  browserOrigin = getBrowserLocation()?.origin,
+}: ApiRuntimeOptions = {}) {
+  const normalizedApiBaseUrl = configuredApiBaseUrl?.trim();
+
+  if (normalizedApiBaseUrl) {
+    try {
+      return new URL(normalizedApiBaseUrl).origin;
+    } catch {
+      if (browserOrigin) {
+        return new URL(normalizedApiBaseUrl, `${browserOrigin}/`).origin;
+      }
+    }
+  }
+
+  if (!isLocalBrowserHost(browserHost)) {
+    return new URL(PRODUCTION_API_BASE_URL).origin;
+  }
+
+  return new URL(LOCAL_API_BASE_URL).origin;
+}
+
+function resolveApiUrl(
+  path: string,
+  params?: URLSearchParams,
+  options?: ApiRuntimeOptions,
+) {
+  const apiBaseUrl = resolveApiBaseUrl(options);
+  const normalizedPath = path.replace(/^\/+/, "");
+  const query = params?.toString();
+
+  try {
+    const url = new URL(normalizedPath, `${apiBaseUrl.replace(/\/+$/, "")}/`);
+    if (query) {
+      url.search = query;
+    }
+    return url.toString();
+  } catch {
+    const relativeUrl = `${apiBaseUrl.replace(/\/+$/, "")}/${normalizedPath}`;
+    return query ? `${relativeUrl}?${query}` : relativeUrl;
+  }
+}
+
+export function resolveAssetUrl(
+  source?: string | null,
+  options?: ApiRuntimeOptions,
+) {
   if (!source) {
     return undefined;
   }
@@ -137,7 +214,7 @@ export function resolveAssetUrl(source?: string | null) {
   } catch {}
 
   try {
-    return new URL(normalizedSource, `${getBackendOrigin()}/`).toString();
+    return new URL(normalizedSource, `${resolveBackendOrigin(options)}/`).toString();
   } catch {
     return undefined;
   }
