@@ -24,6 +24,8 @@ describe("backend api proxy helpers", () => {
         Connection: "keep-alive",
         "Content-Length": "123",
         Host: "b2b.smartforel.com",
+        Origin: "https://b2b.smartforel.com",
+        Referer: "https://b2b.smartforel.com/login",
       }),
     );
 
@@ -33,6 +35,8 @@ describe("backend api proxy helpers", () => {
     expect(headers.has("connection")).toBe(false);
     expect(headers.has("content-length")).toBe(false);
     expect(headers.has("host")).toBe(false);
+    expect(headers.has("origin")).toBe(false);
+    expect(headers.has("referer")).toBe(false);
   });
 
   test("drops hop-by-hop response headers before returning to the browser", () => {
@@ -51,5 +55,18 @@ describe("backend api proxy helpers", () => {
     expect(headers.has("transfer-encoding")).toBe(false);
     expect(headers.has("connection")).toBe(false);
     expect(headers.has("content-encoding")).toBe(false);
+  });
+
+  test("drops upstream set-cookie headers that break the Next.js route proxy", () => {
+    const headers = createBackendApiResponseHeaders(
+      new Headers({
+        "Content-Type": "application/json",
+        "Set-Cookie":
+          "refreshToken=test-token; Max-Age=604800; Path=/; Expires=Fri, 27 Mar 2026 20:13:45 GMT; HttpOnly; SameSite=Strict",
+      }),
+    );
+
+    expect(headers.get("content-type")).toBe("application/json");
+    expect(headers.has("set-cookie")).toBe(false);
   });
 });

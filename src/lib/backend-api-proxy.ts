@@ -5,6 +5,8 @@ const REQUEST_HEADERS_TO_DROP = new Set([
   "connection",
   "content-length",
   "host",
+  "origin",
+  "referer",
 ]);
 
 const RESPONSE_HEADERS_TO_DROP = new Set([
@@ -14,6 +16,7 @@ const RESPONSE_HEADERS_TO_DROP = new Set([
   "keep-alive",
   "proxy-authenticate",
   "proxy-authorization",
+  "set-cookie",
   "te",
   "trailer",
   "transfer-encoding",
