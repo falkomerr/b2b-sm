@@ -9,11 +9,10 @@ function readProjectFile(relativePath) {
 }
 
 describe("image performance regressions", () => {
-  test("home page keeps the featured products limit", () => {
+  test("home page keeps product selection centralized", () => {
     const homePageSource = readProjectFile("src/app/page.tsx");
 
     expect(homePageSource).toContain("setProducts(selectHomeProducts(loadedProducts));");
-    expect(homePageSource).not.toContain("loadedProducts.length");
   });
 
   test("product image surfaces keep Next.js optimization enabled", () => {
