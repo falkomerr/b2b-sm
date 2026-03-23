@@ -9,6 +9,7 @@ import { appRoutes } from "@/lib/app-routes";
 import { getProducts, resolveAssetUrl, type Product } from "@/lib/api";
 import { useAppStore } from "@/lib/app-store";
 import { selectHomeProducts } from "@/lib/home-products";
+import { ORDER_ACCEPTANCE_WINDOW_LABEL } from "@/lib/order-acceptance-window";
 
 const fontFamily =
   'SF Pro Text, SF Pro Display, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -42,7 +43,7 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
 
-    void getProducts({})
+    void getProducts({ b2bFeaturedFirst: true })
       .then((loadedProducts) => {
         if (!active) {
           return;
@@ -140,27 +141,16 @@ function NoticeCard() {
             Обратите внимание
           </h1>
           <p className="mt-1 text-[13px] leading-[17px] tracking-[-0.08px] text-[#8a8b94]">
-            Заказы принимаются
+            Заказы принимаются ежедневно
             <br />
-            с определенного периода
+            с {ORDER_ACCEPTANCE_WINDOW_LABEL} по Бишкеку
           </p>
         </div>
 
-        <button
-          type="button"
-          aria-label="Закрыть уведомление"
-          className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#e6e6ed] text-[#9898a3]"
-        >
-          <CloseSmallIcon />
-        </button>
+        <span className="mt-0.5 inline-flex h-7 items-center justify-center rounded-full bg-[#e6e6ed] px-3 text-[11px] leading-[13px] font-semibold tracking-[-0.08px] text-[#5a5b66]">
+          {ORDER_ACCEPTANCE_WINDOW_LABEL}
+        </span>
       </div>
-
-      <button
-        type="button"
-        className="mt-4 inline-flex h-[34px] items-center justify-center rounded-full bg-[#1688ff] px-4 text-[14px] leading-[17px] font-semibold tracking-[-0.15px] text-white"
-      >
-        Уточнить период
-      </button>
     </section>
   );
 }
@@ -254,22 +244,5 @@ function SalmonPackArt() {
       <div className="absolute bottom-[7px] left-[8px] h-[10px] w-[22px] rounded-[999px] bg-[#ff6c1d]" />
       <div className="absolute bottom-[8px] right-[8px] h-[12px] w-[20px] rounded-[999px] bg-[#ffc06b]" />
     </div>
-  );
-}
-
-function CloseSmallIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 12 12"
-      className="h-3 w-3"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    >
-      <path d="M2 2 10 10" />
-      <path d="M10 2 2 10" />
-    </svg>
   );
 }

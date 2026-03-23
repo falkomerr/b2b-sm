@@ -33,6 +33,7 @@ export type Product = {
   picture?: string;
   quantity: number;
   available: boolean;
+  isB2bFeatured?: boolean;
   category?: Category;
 };
 
@@ -56,6 +57,12 @@ export type CreateOrderPayload = {
   orderedByFullName: string;
   comments?: string;
   address?: OrderAddress;
+};
+
+export type UpdateOrderPayload = {
+  items: CartLine[];
+  orderedByFullName: string;
+  comments?: string;
 };
 
 export type OrderItem = {
@@ -132,7 +139,6 @@ function isLocalBrowserHost(browserHost?: string) {
 
 export function resolveApiBaseUrl({
   configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
-  browserHost = getBrowserLocation()?.hostname,
 }: ApiRuntimeOptions = {}) {
   const normalizedApiBaseUrl = configuredApiBaseUrl?.trim();
 
@@ -140,11 +146,7 @@ export function resolveApiBaseUrl({
     return normalizedApiBaseUrl;
   }
 
-  if (!isLocalBrowserHost(browserHost)) {
-    return PUBLIC_API_PROXY_PATH;
-  }
-
-  return LOCAL_API_BASE_URL;
+  return PUBLIC_API_PROXY_PATH;
 }
 
 function resolveDirectBackendOrigin({
@@ -192,7 +194,7 @@ function resolveAssetBaseUrl({
     }
   }
 
-  return resolveDirectBackendOrigin({ configuredApiBaseUrl, browserHost, browserOrigin });
+  return PUBLIC_ASSET_PROXY_PATH;
 }
 
 function normalizeLegacyProductAssetPath(pathname: string) {
@@ -332,6 +334,7 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
   accessToken?: string,
+  params?: URLSearchParams,
 ) {
   const headers = new Headers(options.headers);
 
@@ -342,7 +345,7 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const response = await fetch(resolveApiUrl(path), {
+  const response = await fetch(resolveApiUrl(path, params), {
     ...options,
     headers,
     credentials: "include",
@@ -427,6 +430,7 @@ export async function getProducts(filters: {
   search?: string;
   category?: string;
   availableOnly?: boolean;
+  b2bFeaturedFirst?: boolean;
 }) {
   const params = new URLSearchParams();
   if (filters.search) {
@@ -438,7 +442,10 @@ export async function getProducts(filters: {
   if (filters.availableOnly) {
     params.set("available", "true");
   }
-  return request<Product[]>("products", {}, undefined).then((products) => {
+  if (filters.b2bFeaturedFirst) {
+    params.set("b2bFeaturedFirst", "true");
+  }
+  return request<Product[]>("products", {}, undefined, params).then((products) => {
     return products.filter((product) => {
       if (filters.search) {
         const term = filters.search.toLowerCase();
@@ -482,4 +489,23 @@ export async function createOrder(payload: CreateOrderPayload, accessToken: stri
 
 export async function getOrders(accessToken: string) {
   return request<Order[]>("orders", {}, accessToken);
+}
+
+export async function getOrderById(orderId: string, accessToken: string) {
+  return request<Order>(`orders/${encodeURIComponent(orderId)}`, {}, accessToken);
+}
+
+export async function updateOrder(
+  orderId: string,
+  payload: UpdateOrderPayload,
+  accessToken: string,
+) {
+  return request<Order>(
+    `orders/${encodeURIComponent(orderId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    accessToken,
+  );
 }

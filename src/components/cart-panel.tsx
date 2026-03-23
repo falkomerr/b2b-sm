@@ -15,6 +15,10 @@ import {
   hasRequiredOrderAddress,
   toOrderAddressPayload,
 } from "@/lib/order-draft";
+import {
+  ORDER_ACCEPTANCE_CLOSED_MESSAGE,
+  isOrderAcceptanceOpen,
+} from "@/lib/order-acceptance-window";
 
 export function CartPanel({ sticky = true }: { sticky?: boolean }) {
   const router = useRouter();
@@ -31,6 +35,10 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const orderAddress = createOrderAddressDraft(session?.user.address);
+  const orderAcceptanceOpen = isOrderAcceptanceOpen();
+  const orderAcceptanceMessage = orderAcceptanceOpen
+    ? null
+    : ORDER_ACCEPTANCE_CLOSED_MESSAGE;
 
   async function handleSubmit() {
     if (!session) {
@@ -49,6 +57,11 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
 
     if (!hasRequiredOrderAddress(orderAddress)) {
       setError("Укажите адрес доставки в настройках профиля.");
+      return;
+    }
+
+    if (!orderAcceptanceOpen) {
+      setError(ORDER_ACCEPTANCE_CLOSED_MESSAGE);
       return;
     }
 
@@ -178,8 +191,17 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
         </div>
       ) : null}
 
+      {orderAcceptanceMessage ? (
+        <div className="rounded-[1.25rem] bg-[#eef5ff] px-4 py-3 text-sm text-[#2563a6]">
+          {orderAcceptanceMessage}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-        <Button onClick={handleSubmit} disabled={!cart.length || isSubmitting}>
+        <Button
+          onClick={handleSubmit}
+          disabled={!cart.length || isSubmitting || !orderAcceptanceOpen}
+        >
           {isSubmitting ? "Отправка..." : "Отправить заявку"}
         </Button>
         <Button

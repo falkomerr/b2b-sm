@@ -14,6 +14,10 @@ import {
   toOrderAddressPayload,
 } from "@/lib/order-draft";
 import {
+  ORDER_ACCEPTANCE_CLOSED_MESSAGE,
+  isOrderAcceptanceOpen,
+} from "@/lib/order-acceptance-window";
+import {
   getCartItemMeta,
   getSelectionCopy,
   reconcileSelectedCartIds,
@@ -63,6 +67,10 @@ export default function CartPage() {
   const hasItems = cart.length > 0;
   const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const deliveryAddress = createOrderAddressDraft(session?.user.address);
+  const orderAcceptanceOpen = isOrderAcceptanceOpen();
+  const orderAcceptanceMessage = orderAcceptanceOpen
+    ? null
+    : ORDER_ACCEPTANCE_CLOSED_MESSAGE;
   const selectionCopy = getSelectionCopy({
     totalCount: cart.length,
     selectedCount: selectedProductIds.length,
@@ -85,6 +93,11 @@ export default function CartPage() {
 
     if (!hasRequiredOrderAddress(deliveryAddress)) {
       setError("Укажите адрес доставки в настройках профиля.");
+      return;
+    }
+
+    if (!orderAcceptanceOpen) {
+      setError(ORDER_ACCEPTANCE_CLOSED_MESSAGE);
       return;
     }
 
@@ -297,6 +310,8 @@ export default function CartPage() {
           </section>
 
           <CartFooter
+            availabilityMessage={orderAcceptanceMessage}
+            checkoutDisabled={!orderAcceptanceOpen}
             inline
             error={error}
             isSubmitting={isSubmitting}
@@ -418,12 +433,16 @@ function CartItemCard({
 }
 
 function CartFooter({
+  availabilityMessage,
+  checkoutDisabled = false,
   error,
   inline = false,
   isSubmitting,
   itemCount,
   onSubmit,
 }: {
+  availabilityMessage?: string | null;
+  checkoutDisabled?: boolean;
   error: string | null;
   inline?: boolean;
   isSubmitting: boolean;
@@ -444,6 +463,12 @@ function CartFooter({
         <span>{itemCount} поз.</span>
       </div>
 
+      {availabilityMessage ? (
+        <div className="mb-3 rounded-[16px] bg-[#eef5ff] px-4 py-3 text-[13px] leading-[18px] tracking-[-0.08px] text-[#2563a6]">
+          {availabilityMessage}
+        </div>
+      ) : null}
+
       {error ? (
         <div className="mb-3 rounded-[16px] bg-[#fff2f2] px-4 py-3 text-[13px] leading-[18px] tracking-[-0.08px] text-[#bf4d4d]">
           {error}
@@ -453,7 +478,7 @@ function CartFooter({
       <button
         type="button"
         onClick={onSubmit}
-        disabled={isSubmitting}
+        disabled={isSubmitting || checkoutDisabled}
         className="flex h-[48px] w-full items-center justify-center rounded-full bg-[#1688ff] text-[16px] leading-[19px] font-semibold tracking-[-0.38px] text-white transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[#9bcbff]"
       >
         {isSubmitting ? "Отправляем заказ..." : "Оформить заказ"}

@@ -11,6 +11,7 @@ describe("selectHomeProducts", () => {
         currency: "KGS",
         quantity: 9,
         available: true,
+        isB2bFeatured: true,
       },
       {
         id: "with-image-b",
@@ -51,9 +52,9 @@ describe("selectHomeProducts", () => {
     ];
 
     expect(selectHomeProducts(products, 3).map((product) => product.id)).toEqual([
+      "no-image",
       "with-image-a",
       "with-image-c",
-      "with-image-b",
     ]);
   });
 
@@ -66,6 +67,7 @@ describe("selectHomeProducts", () => {
         currency: "KGS",
         quantity: 9,
         available: true,
+        isB2bFeatured: true,
       },
       {
         id: "with-image-b",
@@ -106,11 +108,11 @@ describe("selectHomeProducts", () => {
     ];
 
     expect(selectHomeProducts(products).map((product) => product.id)).toEqual([
+      "no-image",
       "with-image-a",
       "with-image-c",
       "with-image-b",
       "unavailable-with-image",
-      "no-image",
     ]);
   });
 
