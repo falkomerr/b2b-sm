@@ -511,7 +511,7 @@ function OrderHistoryCard({ order }: { order: Order }) {
             {formatOrderDateTime(order.dateInsert)}
           </p>
           <p className="mt-0.5 text-[12px] leading-4 text-[#8e8e93]">
-            Кол-во позиций: {getOrderItemCount(order)} шт.
+            Кол-во позиций: {getOrderItemCount(order)}
           </p>
         </div>
 

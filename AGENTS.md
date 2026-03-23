@@ -28,7 +28,7 @@ bd sync               # Sync with git
    git push
    git status  # MUST show "up to date with origin"
    ```
-5. **Verify devpush build after commit** - After each git commit, confirm the project builds successfully in devpush before treating the change as landed
+5. **Verify devpush build after commit** - After each git commit, confirm the project builds successfully in devpush on the target server before treating the change as landed. Do not use Jenkins as the final source of truth.
 6. **Clean up** - Clear stashes, prune remote branches
 7. **Verify** - All changes committed AND pushed
 8. **Hand off** - Provide context for next session

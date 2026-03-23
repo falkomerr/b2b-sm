@@ -1,3 +1,5 @@
+import { formatQuantity, type ProductUnit } from "./product-units";
+
 type ReconcileSelectedCartIdsArgs = {
   cartProductIds: string[];
   previousCartProductIds: string[];
@@ -7,6 +9,7 @@ type ReconcileSelectedCartIdsArgs = {
 type CartMetaArgs = {
   categoryName?: string | null;
   quantity: number;
+  unit: ProductUnit;
 };
 
 type SelectionCopyArgs = {
@@ -31,12 +34,12 @@ export function reconcileSelectedCartIds({
   return cartProductIds.filter((productId) => selectedIds.has(productId));
 }
 
-export function getCartItemMeta({ categoryName, quantity }: CartMetaArgs) {
+export function getCartItemMeta({ categoryName, quantity, unit }: CartMetaArgs) {
   const normalizedCategoryName = categoryName?.trim();
 
   return [
     normalizedCategoryName || "Поставка из общего каталога",
-    `${quantity} шт.`,
+    formatQuantity(quantity, unit),
   ].join(" • ");
 }
 

@@ -24,6 +24,12 @@ import {
   toOrderAddressPayload,
   type OrderAddressDraft,
 } from "@/lib/order-draft";
+import {
+  decrementQuantity,
+  getInitialQuantityForUnit,
+  incrementQuantity,
+  normalizeQuantity,
+} from "@/lib/product-units";
 
 type OrderDraft = {
   orderedByFullName: string;
@@ -93,6 +99,7 @@ function clampQuantity(quantity: number, max: number) {
 function normalizeCartSnapshotItem(item: CartSnapshotItem): CartSnapshotItem {
   return {
     ...item,
+    unit: item.unit ?? "piece",
     imageUrl: normalizeAssetSource(item.imageUrl),
   };
 }
@@ -101,11 +108,12 @@ export function normalizePersistedState(persisted: PersistedState): PersistedSta
   return {
     session: persisted.session,
     ...(persisted.recentOrders
-      ? {
+        ? {
           recentOrders: persisted.recentOrders.map((order) => ({
             ...order,
             items: order.items.map((item) => ({
               ...item,
+              unit: item.unit ?? "piece",
               imageUrl: normalizeAssetSource(item.imageUrl),
             })),
           })),
@@ -145,7 +153,8 @@ function createLeanCartPersistedState(snapshot: StoreSnapshot): CompactPersisted
   return {
     session: snapshot.session,
     cart: snapshot.cart.map(
-      ({ productId, productName, quantity, quantityAvailable, available }) => ({
+      ({ productId, productName, quantity, quantityAvailable, available, unit }) => ({
+        unit,
         productId,
         productName,
         quantity,
@@ -311,7 +320,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     recentOrders,
     cart,
     orderDraft,
-    cartCount: cart.reduce((total, item) => total + item.quantity, 0),
+    cartCount: cart.length,
     async login(credentials) {
       const auth = await loginB2BRequest(credentials);
       const user = await getCurrentUser(auth.accessToken);
@@ -376,14 +385,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         const existing = current.find((item) => item.productId === product.id);
 
         if (!existing) {
+          const initialQuantity = getInitialQuantityForUnit(product.unit);
           return [
             ...current,
             {
               productId: product.id,
               productName: product.name,
+              unit: product.unit,
               imageUrl: normalizeAssetSource(product.picture),
               categoryName: product.category?.name,
-              quantity: product.available ? 1 : 0,
+              quantity: product.available ? initialQuantity : 0,
               quantityAvailable: product.quantity,
               available: product.available,
             },
@@ -396,9 +407,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
           return {
             ...item,
+            unit: product.unit,
             quantityAvailable: product.quantity,
             available: product.available,
-            quantity: clampQuantity(item.quantity + 1, product.quantity),
+            quantity: clampQuantity(
+              incrementQuantity(item.quantity, product.unit),
+              product.quantity,
+            ),
           };
         });
       });
@@ -412,7 +427,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             }
             return {
               ...item,
-              quantity: item.quantity - 1,
+              quantity: decrementQuantity(item.quantity, item.unit),
             };
           })
           .filter((item) => item.quantity > 0);
@@ -427,7 +442,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             }
             return {
               ...item,
-              quantity: clampQuantity(quantity, item.quantityAvailable || quantity),
+              quantity: clampQuantity(
+                normalizeQuantity(quantity, item.unit),
+                item.quantityAvailable || quantity,
+              ),
             };
           })
           .filter((item) => item.quantity > 0);
@@ -438,6 +456,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         order.items.map((item) => ({
           productId: item.productId,
           productName: item.productName,
+          unit: item.unit,
           imageUrl: normalizeAssetSource(item.imageUrl),
           quantity: item.quantity,
           quantityAvailable: item.quantity,

@@ -4,11 +4,13 @@ import {
   type Product,
   type UpdateOrderPayload,
 } from "@/lib/api";
+import { getInitialQuantityForUnit, getQuantityStep, type ProductUnit } from "@/lib/product-units";
 
 export type OrderEditDraftItem = {
   id: string;
   productId: string;
   productName: string;
+  unit: ProductUnit;
   quantity: number;
   price: number;
   imageUrl?: string;
@@ -41,6 +43,7 @@ export function createOrderEditDraft(order: Pick<
       id: item.id,
       productId: item.productId,
       productName: item.productName,
+      unit: item.unit,
       quantity: item.quantity,
       price: item.price,
       imageUrl: normalizeAssetSource(item.imageUrl),
@@ -50,7 +53,7 @@ export function createOrderEditDraft(order: Pick<
 
 export function addProductToOrderEditDraft(
   draft: OrderEditDraft,
-  product: Pick<Product, "id" | "name" | "price" | "available" | "quantity" | "picture">,
+  product: Pick<Product, "id" | "name" | "price" | "available" | "quantity" | "picture" | "unit">,
 ): OrderEditDraft {
   if (!product.available || product.quantity <= 0) {
     return draft;
@@ -58,6 +61,7 @@ export function addProductToOrderEditDraft(
 
   const nextImageUrl = normalizeAssetSource(product.picture);
   const existingItem = draft.items.find((item) => item.productId === product.id);
+  const quantityStep = getQuantityStep(product.unit);
 
   if (existingItem) {
     return {
@@ -66,7 +70,8 @@ export function addProductToOrderEditDraft(
         item.productId === product.id
           ? {
               ...item,
-              quantity: item.quantity + 1,
+              unit: product.unit,
+              quantity: item.quantity + quantityStep,
               price: product.price,
               imageUrl: nextImageUrl ?? item.imageUrl,
             }
@@ -83,7 +88,8 @@ export function addProductToOrderEditDraft(
         id: product.id,
         productId: product.id,
         productName: product.name,
-        quantity: 1,
+        unit: product.unit,
+        quantity: getInitialQuantityForUnit(product.unit),
         price: product.price,
         ...(nextImageUrl ? { imageUrl: nextImageUrl } : {}),
       },
@@ -140,6 +146,7 @@ export function syncOrderEditDraftWithCatalogProducts(
 
       return {
         ...item,
+        unit: product.unit,
         price: product.price,
         imageUrl: product.picture ? normalizeAssetSource(product.picture) : item.imageUrl,
       };
@@ -152,7 +159,7 @@ export function getOrderEditDraftTotal(draft: Pick<OrderEditDraft, "items">) {
 }
 
 export function getOrderEditDraftItemCount(draft: Pick<OrderEditDraft, "items">) {
-  return draft.items.reduce((total, item) => total + item.quantity, 0);
+  return draft.items.length;
 }
 
 export function getOrderEditDraftValidationError(

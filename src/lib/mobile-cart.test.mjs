@@ -33,17 +33,19 @@ describe("getCartItemMeta", () => {
       getCartItemMeta({
         categoryName: "Форель",
         quantity: 3,
+        unit: "piece",
       }),
-    ).toBe("Форель • 3 шт.");
+    ).toBe("Форель • 3 шт");
   });
 
   test("uses generic fallback when category is missing", () => {
     expect(
       getCartItemMeta({
         categoryName: "",
-        quantity: 1,
+        quantity: 0.25,
+        unit: "kg",
       }),
-    ).toBe("Поставка из общего каталога • 1 шт.");
+    ).toBe("Поставка из общего каталога • 0.25 кг");
   });
 });
 

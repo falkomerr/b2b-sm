@@ -2,6 +2,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/button";
+import { QuantityControl } from "@/components/quantity-control";
 import { getOrderDetailsRoute } from "@/lib/app-routes";
 import {
   createOrder,
@@ -19,6 +20,7 @@ import {
   ORDER_ACCEPTANCE_CLOSED_MESSAGE,
   isOrderAcceptanceOpen,
 } from "@/lib/order-acceptance-window";
+import { canIncrementQuantity, formatQuantity } from "@/lib/product-units";
 
 export function CartPanel({ sticky = true }: { sticky?: boolean }) {
   const router = useRouter();
@@ -136,6 +138,7 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
                   name: item.productName,
                   price: 0,
                   currency: "KGS",
+                  unit: item.unit,
                   quantity: item.quantityAvailable || item.quantity,
                   available: item.available,
                   picture: item.imageUrl,
@@ -256,7 +259,8 @@ function CartRow({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{item.productName}</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {item.categoryName ?? "Поставка из общего каталога"}
+            {(item.categoryName ?? "Поставка из общего каталога")} ·{" "}
+            {formatQuantity(item.quantity, item.unit)}
           </p>
         </div>
       </div>
@@ -264,21 +268,15 @@ function CartRow({
         <span className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
           Без цены
         </span>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" className="h-9 px-3" onClick={onDecrement}>
-            -
-          </Button>
-          <div className="min-w-10 rounded-full bg-white px-3 py-2 text-center text-sm font-semibold">
-            {item.quantity}
-          </div>
-          <Button
-            className="h-9 px-3"
-            onClick={onIncrement}
-            disabled={!item.available || item.quantity >= item.quantityAvailable}
-          >
-            +
-          </Button>
-        </div>
+        <QuantityControl
+          disabled={!item.available}
+          incrementDisabled={!canIncrementQuantity(item.quantity, item.quantityAvailable, item.unit)}
+          onChange={() => undefined}
+          onDecrement={onDecrement}
+          onIncrement={onIncrement}
+          quantity={item.quantity}
+          unit={item.unit}
+        />
       </div>
     </div>
   );

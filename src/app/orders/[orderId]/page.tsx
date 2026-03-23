@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { startTransition, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/button";
 import { MobileAppFrame } from "@/components/mobile-app-frame";
+import { QuantityControl } from "@/components/quantity-control";
 import { appRoutes } from "@/lib/app-routes";
 import {
   getOrderById,
@@ -36,6 +37,11 @@ import {
   getOrderItemCount,
 } from "@/lib/profile-presentation";
 import { selectHomeProducts } from "@/lib/home-products";
+import {
+  canIncrementQuantity,
+  formatPricePerUnit,
+  formatQuantity,
+} from "@/lib/product-units";
 import { useAppStore } from "@/lib/app-store";
 
 const orderItemFallbackSrc = "/assets/profile/order-item-fish-2ab092.png";
@@ -508,7 +514,7 @@ function OrderOverviewCard({
             {formatOrderDateTime(order.dateInsert)}
           </p>
           <p className="mt-0.5 text-[12px] leading-4 text-[#8e8e93]">
-            Кол-во позиций: {itemCount} шт.
+            Кол-во позиций: {itemCount}
           </p>
         </div>
 
@@ -651,7 +657,9 @@ function EditableOrderItemsCard({
         {draft.items.map((item, index) => {
           const product = productAvailability.get(item.productId);
           const canIncrement = Boolean(
-            product && product.available && item.quantity < product.quantity,
+            product
+              && product.available
+              && canIncrementQuantity(item.quantity, product.quantity, item.unit),
           );
 
           return (
@@ -667,6 +675,7 @@ function EditableOrderItemsCard({
                 }
                 canIncrement={canIncrement}
                 item={item}
+                onChange={(quantity) => onQuantityChange(item.productId, quantity)}
                 onDecrement={() => onQuantityChange(item.productId, item.quantity - 1)}
                 onIncrement={() => {
                   if (!canIncrement) {
@@ -689,6 +698,7 @@ function EditableOrderItemsCard({
 function EditableOrderItemRow({
   badge,
   canIncrement,
+  onChange,
   item,
   onDecrement,
   onIncrement,
@@ -697,6 +707,7 @@ function EditableOrderItemRow({
 }: {
   badge: string;
   canIncrement: boolean;
+  onChange: (quantity: number) => void;
   item: OrderEditDraft["items"][number];
   onDecrement: () => void;
   onIncrement: () => void;
@@ -735,11 +746,13 @@ function EditableOrderItemRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <InlineQuantityStepper
-            canIncrement={canIncrement}
+          <QuantityControl
+            incrementDisabled={!canIncrement}
+            onChange={onChange}
             onDecrement={onDecrement}
             onIncrement={onIncrement}
             quantity={item.quantity}
+            unit={item.unit}
           />
           <button
             type="button"
@@ -802,7 +815,9 @@ function OrderCatalogCard({
           {products.map((product) => {
             const quantityInDraft =
               draft.items.find((item) => item.productId === product.id)?.quantity ?? 0;
-            const canAdd = product.available && quantityInDraft < product.quantity;
+            const canAdd =
+              product.available
+              && canIncrementQuantity(quantityInDraft, product.quantity, product.unit);
 
             return (
               <CatalogProductCard
@@ -858,7 +873,7 @@ function CatalogProductCard({
         {product.name}
       </p>
       <p className="mt-1 text-[11px] leading-[13px] tracking-[0.01em] text-[#8e8e93]">
-        {quantityInDraft > 0 ? `В заказе: ${quantityInDraft} шт.` : "Еще не добавлен"}
+        {quantityInDraft > 0 ? `В заказе: ${formatQuantity(quantityInDraft, product.unit)}` : "Еще не добавлен"}
       </p>
 
       <button
@@ -970,7 +985,7 @@ function OrderItemRow({
             {item.productName}
           </p>
           <p className="text-[11px] leading-[13px] tracking-[0.01em] text-[#121212]">
-            {item.quantity} шт
+            {formatQuantity(item.quantity, item.unit)}
           </p>
         </div>
       </div>
@@ -980,44 +995,9 @@ function OrderItemRow({
           {formatOrderMoney(item.price * item.quantity, order.currency)}
         </p>
         <p className="text-[11px] leading-[13px] tracking-[0.01em] text-[#8e8e93]">
-          {formatOrderMoney(item.price, order.currency)} / шт
+          {formatPricePerUnit(formatOrderMoney(item.price, order.currency), item.unit)}
         </p>
       </div>
-    </div>
-  );
-}
-
-function InlineQuantityStepper({
-  canIncrement,
-  onDecrement,
-  onIncrement,
-  quantity,
-}: {
-  canIncrement: boolean;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  quantity: number;
-}) {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-[#f4f5f7] px-2 py-1">
-      <button
-        type="button"
-        onClick={onDecrement}
-        className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[16px] leading-none text-[#121212] shadow-[0_4px_10px_rgba(15,23,42,0.08)]"
-      >
-        -
-      </button>
-      <span className="min-w-[16px] text-center text-[14px] leading-[17px] font-semibold tracking-[-0.15px] text-[#121212]">
-        {quantity}
-      </span>
-      <button
-        type="button"
-        onClick={onIncrement}
-        disabled={!canIncrement}
-        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1688ff] text-[16px] leading-none text-white disabled:bg-[#cfe4fb]"
-      >
-        +
-      </button>
     </div>
   );
 }

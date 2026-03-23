@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { MobileAppFrame } from "@/components/mobile-app-frame";
+import { QuantityControl } from "@/components/quantity-control";
 import { appRoutes, getOrderDetailsRoute } from "@/lib/app-routes";
 import { createOrder, resolveAssetUrl, validateCart } from "@/lib/api";
 import { useAppStore } from "@/lib/app-store";
@@ -22,6 +23,7 @@ import {
   getSelectionCopy,
   reconcileSelectedCartIds,
 } from "@/lib/mobile-cart";
+import { canIncrementQuantity } from "@/lib/product-units";
 
 const emptyCartImageSrc = "/assets/cart/empty-cart-fish-5d8ecb.png";
 
@@ -65,7 +67,7 @@ export default function CartPage() {
   }, [cart]);
 
   const hasItems = cart.length > 0;
-  const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
+  const itemCount = cart.length;
   const deliveryAddress = createOrderAddressDraft(session?.user.address);
   const orderAcceptanceOpen = isOrderAcceptanceOpen();
   const orderAcceptanceMessage = orderAcceptanceOpen
@@ -225,6 +227,7 @@ export default function CartPage() {
                     name: item.productName,
                     price: 0,
                     currency: "KGS",
+                    unit: item.unit,
                     quantity: item.quantityAvailable || item.quantity,
                     available: item.available,
                     picture: item.imageUrl,
@@ -233,6 +236,7 @@ export default function CartPage() {
                       : undefined,
                   })
                 }
+                onQuantityChange={(quantity) => setCartQuantity(item.productId, quantity)}
                 onToggle={() =>
                   setSelectedProductIds((currentSelection) => {
                     if (currentSelection.includes(item.productId)) {
@@ -361,12 +365,14 @@ function CartItemCard({
   item,
   onDecrement,
   onIncrement,
+  onQuantityChange,
   onToggle,
 }: {
   checked: boolean;
   item: ReturnType<typeof useAppStore>["cart"][number];
   onDecrement: () => void;
   onIncrement: () => void;
+  onQuantityChange: (quantity: number) => void;
   onToggle: () => void;
 }) {
   const imageUrl = resolveAssetUrl(item.imageUrl);
@@ -418,12 +424,14 @@ function CartItemCard({
               {item.available ? "В наличии" : "Нет в наличии"}
             </span>
 
-            <QuantityStepper
+            <QuantityControl
               disabled={!item.available}
+              incrementDisabled={!canIncrementQuantity(item.quantity, item.quantityAvailable, item.unit)}
+              onChange={onQuantityChange}
               onDecrement={onDecrement}
               onIncrement={onIncrement}
               quantity={item.quantity}
-              incrementDisabled={item.quantity >= item.quantityAvailable}
+              unit={item.unit}
             />
           </div>
         </div>
@@ -482,44 +490,6 @@ function CartFooter({
         className="flex h-[48px] w-full items-center justify-center rounded-full bg-[#1688ff] text-[16px] leading-[19px] font-semibold tracking-[-0.38px] text-white transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[#9bcbff]"
       >
         {isSubmitting ? "Отправляем заказ..." : "Оформить заказ"}
-      </button>
-    </div>
-  );
-}
-
-function QuantityStepper({
-  disabled,
-  incrementDisabled,
-  onDecrement,
-  onIncrement,
-  quantity,
-}: {
-  disabled: boolean;
-  incrementDisabled: boolean;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  quantity: number;
-}) {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-[#f4f5f7] px-2 py-1">
-      <button
-        type="button"
-        onClick={onDecrement}
-        disabled={disabled}
-        className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[16px] leading-none text-[#121212] shadow-[0_4px_10px_rgba(15,23,42,0.08)] disabled:text-[#c6c7cf]"
-      >
-        -
-      </button>
-      <span className="min-w-[16px] text-center text-[14px] leading-[17px] font-semibold tracking-[-0.15px] text-[#121212]">
-        {quantity}
-      </span>
-      <button
-        type="button"
-        onClick={onIncrement}
-        disabled={disabled || incrementDisabled}
-        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1688ff] text-[16px] leading-none text-white disabled:bg-[#cfe4fb]"
-      >
-        +
       </button>
     </div>
   );

@@ -27,4 +27,12 @@ describe("order details page regressions", () => {
       "}, [catalogError, catalogLoading, catalogProducts.length, isEditing, session]);",
     );
   });
+
+  test("page source no longer hardcodes piece-only quantity labels", () => {
+    const source = readProjectFile("src/app/orders/[orderId]/page.tsx");
+
+    expect(source).toContain("formatQuantity(");
+    expect(source).toContain("formatPricePerUnit(");
+    expect(source).not.toContain("/ шт");
+  });
 });

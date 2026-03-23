@@ -1,4 +1,5 @@
 import type { OrderAddress } from "@/lib/order-draft";
+import type { ProductUnit } from "@/lib/product-units";
 
 export type AccountType = "retail" | "b2b_company";
 
@@ -29,6 +30,7 @@ export type Product = {
   name: string;
   price: number;
   currency: string;
+  unit: ProductUnit;
   description?: string;
   picture?: string;
   quantity: number;
@@ -45,6 +47,7 @@ export type CartLine = {
 export type CartSnapshotItem = {
   productId: string;
   productName: string;
+  unit: ProductUnit;
   imageUrl?: string;
   categoryName?: string;
   quantity: number;
@@ -69,6 +72,7 @@ export type OrderItem = {
   id: string;
   productId: string;
   productName: string;
+  unit: ProductUnit;
   quantity: number;
   price: number;
   imageUrl?: string;
