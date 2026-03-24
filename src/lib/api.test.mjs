@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  authPayloadToCurrentUser,
   getOrderById,
   getProducts,
+  loginB2B,
   normalizeAssetSource,
   resolveApiBaseUrl,
   resolveAssetUrl,
@@ -114,6 +116,75 @@ describe("getProducts", () => {
     expect(url.searchParams.get("category")).toBe("cat-1");
     expect(url.searchParams.get("available")).toBe("true");
     expect(url.searchParams.get("b2bFeaturedFirst")).toBe("true");
+  });
+});
+
+describe("authPayloadToCurrentUser", () => {
+  test("maps b2b login response into the session user shape", () => {
+    expect(
+      authPayloadToCurrentUser({
+        accessToken: "token",
+        userId: "user-42",
+        username: "acme",
+        email: "buyer@example.com",
+        companyName: "Acme LLC",
+        accountType: "b2b_company",
+        name: "Иван Иванов",
+        phone: "+996700000000",
+        address: {
+          settlement: "Бишкек",
+          street: "Логвиненко",
+          house: "55",
+          apartment: "12",
+          entrance: "2",
+          floor: "3",
+          comment: "Офис",
+        },
+      }),
+    ).toEqual({
+      userId: "user-42",
+      username: "acme",
+      email: "buyer@example.com",
+      companyName: "Acme LLC",
+      accountType: "b2b_company",
+      name: "Иван Иванов",
+      phone: "+996700000000",
+      address: {
+        settlement: "Бишкек",
+        street: "Логвиненко",
+        house: "55",
+        apartment: "12",
+        entrance: "2",
+        floor: "3",
+        comment: "Офис",
+      },
+    });
+  });
+});
+
+describe("loginB2B", () => {
+  test("maps throttling responses to a user-friendly message", async () => {
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          success: false,
+          message: "ThrottlerException: Too Many Requests",
+          statusCode: 429,
+        }),
+        {
+          status: 429,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      );
+
+    await expect(
+      loginB2B({
+        login: "acme",
+        password: "secret",
+      }),
+    ).rejects.toThrow("Слишком много запросов. Подождите минуту и попробуйте снова.");
   });
 });
 

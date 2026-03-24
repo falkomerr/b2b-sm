@@ -14,6 +14,7 @@ import {
   type CurrentUser,
   type Order,
   type Product,
+  authPayloadToCurrentUser,
   getCurrentUser,
   loginB2B as loginB2BRequest,
   logout as logoutRequest,
@@ -509,7 +510,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     cartCount: cart.length,
     async login(credentials) {
       const auth = await loginB2BRequest(credentials);
-      const user = await getCurrentUser(auth.accessToken);
+      const user = authPayloadToCurrentUser(auth);
 
       setSession(createSessionState(auth.accessToken, user));
       setOrderDraft((current) => ({

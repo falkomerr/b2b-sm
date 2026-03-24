@@ -313,7 +313,11 @@ export function normalizeAssetSource(source?: string | null) {
   return normalizeLegacyProductAssetPath(trimmedSource) ?? trimmedSource;
 }
 
-function extractErrorMessage(payload: unknown, fallback: string) {
+function extractErrorMessage(payload: unknown, fallback: string, status?: number) {
+  if (status === 429) {
+    return "Слишком много запросов. Подождите минуту и попробуйте снова.";
+  }
+
   if (!payload || typeof payload !== "object") {
     return fallback;
   }
@@ -361,7 +365,7 @@ async function request<T>(
 
   if (!response.ok) {
     throw new Error(
-      extractErrorMessage(payload, `Request failed with status ${response.status}`),
+      extractErrorMessage(payload, `Request failed with status ${response.status}`, response.status),
     );
   }
 
@@ -383,6 +387,10 @@ function mapCurrentUser(payload: CurrentUserPayload): CurrentUser {
     address: payload.address,
     accountType: payload.accountType,
   };
+}
+
+export function authPayloadToCurrentUser(payload: AuthPayload): CurrentUser {
+  return mapCurrentUser(payload);
 }
 
 export async function loginB2B(credentials: {
