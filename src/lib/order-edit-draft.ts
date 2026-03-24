@@ -25,8 +25,61 @@ export type OrderEditDraft = {
   items: OrderEditDraftItem[];
 };
 
-export function isOrderEditable(statusId: string) {
-  return !new Set(["D", "C"]).has(statusId);
+const ORDER_EDITABLE_START_MINUTES = 6 * 60;
+const ORDER_EDITABLE_END_MINUTES = 23 * 60 + 50;
+const ORDER_EDITABLE_TIMEZONE = "Asia/Bishkek";
+const READONLY_ORDER_STATUSES = new Set(["D", "C"]);
+
+function getBishkekDateParts(date: Date) {
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: ORDER_EDITABLE_TIMEZONE,
+    year: "numeric",
+  }).formatToParts(date);
+
+  return {
+    day: Number(parts.find((part) => part.type === "day")?.value ?? "0"),
+    hour: Number(parts.find((part) => part.type === "hour")?.value ?? "0"),
+    minute: Number(parts.find((part) => part.type === "minute")?.value ?? "0"),
+    month: Number(parts.find((part) => part.type === "month")?.value ?? "0"),
+    year: Number(parts.find((part) => part.type === "year")?.value ?? "0"),
+  };
+}
+
+export function isOrderEditable(
+  order: Pick<Order, "statusId" | "dateInsert">,
+  now = new Date(),
+) {
+  if (READONLY_ORDER_STATUSES.has(order.statusId)) {
+    return false;
+  }
+
+  const currentDateParts = getBishkekDateParts(now);
+  const orderDateParts = getBishkekDateParts(new Date(order.dateInsert));
+
+  if (!currentDateParts || !orderDateParts) {
+    return false;
+  }
+
+  const isSameBishkekDay =
+    currentDateParts.year === orderDateParts.year
+    && currentDateParts.month === orderDateParts.month
+    && currentDateParts.day === orderDateParts.day;
+  const currentMinutes = currentDateParts.hour * 60 + currentDateParts.minute;
+
+  return (
+    isSameBishkekDay
+    && currentMinutes >= ORDER_EDITABLE_START_MINUTES
+    && currentMinutes <= ORDER_EDITABLE_END_MINUTES
+  );
 }
 
 export function createOrderEditDraft(order: Pick<

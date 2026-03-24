@@ -35,4 +35,12 @@ describe("order details page regressions", () => {
     expect(source).toContain("formatPricePerUnit(");
     expect(source).not.toContain("/ шт");
   });
+
+  test("edit availability is driven by the full order and a live clock tick", () => {
+    const source = readProjectFile("src/app/orders/[orderId]/page.tsx");
+
+    expect(source).toContain("const [nowTick, setNowTick] = useState(() => Date.now());");
+    expect(source).toContain("const canEdit = order ? isOrderEditable(order, new Date(nowTick)) : false;");
+    expect(source).not.toContain("const canEdit = order ? isOrderEditable(order.statusId) : false;");
+  });
 });

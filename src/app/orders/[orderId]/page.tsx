@@ -70,6 +70,7 @@ export default function OrderDetailsPage() {
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [reloadToken, setReloadToken] = useState(0);
   const rememberOrderRef = useRef(rememberOrder);
   const recentOrdersRef = useRef(recentOrders);
@@ -77,6 +78,16 @@ export default function OrderDetailsPage() {
   useEffect(() => {
     rememberOrderRef.current = rememberOrder;
   }, [rememberOrder]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 30_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     recentOrdersRef.current = recentOrders;
@@ -154,14 +165,16 @@ export default function OrderDetailsPage() {
     setDraft(createOrderEditDraft(order));
   }, [isEditing, order]);
 
+  const canEdit = order ? isOrderEditable(order, new Date(nowTick)) : false;
+
   useEffect(() => {
-    if (!order || !isEditing || isOrderEditable(order.statusId)) {
+    if (!order || !isEditing || canEdit) {
       return;
     }
 
     setIsEditing(false);
     setSaveError("Заказ больше нельзя редактировать.");
-  }, [isEditing, order]);
+  }, [canEdit, isEditing, order]);
 
   useEffect(() => {
     setCatalogProducts([]);
@@ -226,7 +239,6 @@ export default function OrderDetailsPage() {
     );
   }, [catalogProducts, isEditing]);
 
-  const canEdit = order ? isOrderEditable(order.statusId) : false;
   const validationError = draft ? getOrderEditDraftValidationError(draft) : null;
   const total = draft && isEditing ? getOrderEditDraftTotal(draft) : order?.price ?? 0;
   const itemCount =
@@ -235,6 +247,12 @@ export default function OrderDetailsPage() {
 
   async function handleSave() {
     if (!session || !order || !draft) {
+      return;
+    }
+
+    if (!isOrderEditable(order)) {
+      setSaveError("Заказ больше нельзя редактировать.");
+      setIsEditing(false);
       return;
     }
 
@@ -277,6 +295,11 @@ export default function OrderDetailsPage() {
 
   function handleStartEdit() {
     if (!order) {
+      return;
+    }
+
+    if (!isOrderEditable(order)) {
+      setSaveError("Заказ больше нельзя редактировать.");
       return;
     }
 

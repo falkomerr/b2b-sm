@@ -16,6 +16,11 @@ bd sync               # Sync with git
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
 
+## Deploy
+
+- Для `/Users/falkomer/work/sm-b2b` и `/Users/falkomer/work/sm-landing-backend` деплой выполняй через `git push`, потому что на хосте настроен `devpush`.
+- Не используй ручной деплой по SSH, `docker compose`, `scp` или прямые правки на сервере вместо `git push`, если пользователь явно не попросил именно такой способ.
+
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up

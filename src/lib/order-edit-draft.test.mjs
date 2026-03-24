@@ -4,6 +4,7 @@ import {
   createOrderEditDraft,
   getOrderEditDraftTotal,
   getOrderEditDraftValidationError,
+  isOrderEditable,
   removeProductFromOrderEditDraft,
   syncOrderEditDraftWithCatalogProducts,
   toUpdateOrderPayload,
@@ -205,5 +206,38 @@ describe("order edit draft helpers", () => {
       orderedByFullName: "Иван Иванов",
       comments: "Позвонить заранее",
     });
+  });
+
+  test("allows editing only for today's Bishkek orders between 06:00 and 23:50", () => {
+    const order = makeOrder({
+      dateInsert: "2026-03-23T18:30:00.000Z",
+      statusId: "N",
+    });
+
+    expect(isOrderEditable(order, new Date("2026-03-23T23:59:00.000Z"))).toBe(false);
+    expect(isOrderEditable(order, new Date("2026-03-24T00:00:00.000Z"))).toBe(true);
+    expect(isOrderEditable(order, new Date("2026-03-24T17:50:00.000Z"))).toBe(true);
+    expect(isOrderEditable(order, new Date("2026-03-24T17:51:00.000Z"))).toBe(false);
+  });
+
+  test("disables editing for orders outside today's Bishkek date or readonly statuses", () => {
+    const activeOrderFromPreviousBishkekDay = makeOrder({
+      dateInsert: "2026-03-23T17:59:00.000Z",
+      statusId: "N",
+    });
+    const deliveredOrderFromToday = makeOrder({
+      dateInsert: "2026-03-24T01:00:00.000Z",
+      statusId: "D",
+    });
+
+    expect(
+      isOrderEditable(
+        activeOrderFromPreviousBishkekDay,
+        new Date("2026-03-24T05:30:00.000Z"),
+      ),
+    ).toBe(false);
+    expect(
+      isOrderEditable(deliveredOrderFromToday, new Date("2026-03-24T05:30:00.000Z")),
+    ).toBe(false);
   });
 });
