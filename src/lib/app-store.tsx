@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -39,6 +40,7 @@ type OrderDraft = {
 
 type SessionState = {
   accessToken: string;
+  expiresAt: number;
   user: CurrentUser;
 };
 
@@ -83,6 +85,8 @@ type PersistedState = {
 type CompactPersistedState = Omit<PersistedState, "recentOrders">;
 
 const STORAGE_KEY = "sm-b2b.state";
+export const SESSION_EXPIRED_NOTICE_KEY = "sm-b2b.session-expired";
+export const SESSION_TTL_MS = 600_000;
 const RECENT_ORDERS_LIMIT = 10;
 
 const defaultDraft: OrderDraft = {
@@ -104,6 +108,40 @@ function normalizeCartSnapshotItem(item: CartSnapshotItem): CartSnapshotItem {
   };
 }
 
+export function createSessionState(
+  accessToken: string,
+  user: CurrentUser,
+  now = Date.now(),
+): SessionState {
+  return {
+    accessToken,
+    expiresAt: now + SESSION_TTL_MS,
+    user,
+  };
+}
+
+export function replaceSessionUser(
+  session: SessionState,
+  user: CurrentUser,
+): SessionState {
+  return {
+    accessToken: session.accessToken,
+    expiresAt: session.expiresAt,
+    user,
+  };
+}
+
+export function isSessionExpired(
+  session: SessionState | null | undefined,
+  now = Date.now(),
+) {
+  if (!session) {
+    return false;
+  }
+
+  return !Number.isFinite(session.expiresAt) || session.expiresAt <= now;
+}
+
 export function normalizePersistedState(persisted: PersistedState): PersistedState {
   return {
     session: persisted.session,
@@ -120,7 +158,10 @@ export function normalizePersistedState(persisted: PersistedState): PersistedSta
         }
       : {}),
     cart: (persisted.cart ?? []).map(normalizeCartSnapshotItem),
-    orderDraft: persisted.orderDraft,
+    orderDraft: {
+      ...defaultDraft,
+      ...(persisted.orderDraft ?? {}),
+    },
   };
 }
 
@@ -135,7 +176,7 @@ function readPersistedState(): PersistedState | null {
   }
 
   try {
-    return normalizePersistedState(JSON.parse(raw) as PersistedState);
+    return JSON.parse(raw) as PersistedState;
   } catch {
     return null;
   }
@@ -255,32 +296,138 @@ export function createCompletedOrderPersistedState(
   };
 }
 
+export function createExpiredPersistedState(
+  snapshot: StoreSnapshot,
+): StoreSnapshot {
+  return {
+    ...snapshot,
+    session: null,
+    recentOrders: [],
+  };
+}
+
+export function restorePersistedState(
+  persisted: PersistedState,
+  now = Date.now(),
+): {
+  expired: boolean;
+  state: PersistedState;
+} {
+  const normalized = normalizePersistedState(persisted);
+
+  if (!isSessionExpired(normalized.session, now)) {
+    return {
+      expired: false,
+      state: normalized,
+    };
+  }
+
+  return {
+    expired: normalized.session !== null,
+    state: createExpiredPersistedState({
+      session: normalized.session,
+      recentOrders: normalized.recentOrders ?? [],
+      cart: normalized.cart,
+      orderDraft: normalized.orderDraft,
+    }),
+  };
+}
+
+export function markSessionExpiredNotice(storage: Pick<Storage, "setItem">) {
+  storage.setItem(SESSION_EXPIRED_NOTICE_KEY, "1");
+}
+
+export function consumeSessionExpiredNotice(
+  storage: Pick<Storage, "getItem" | "removeItem">,
+) {
+  if (storage.getItem(SESSION_EXPIRED_NOTICE_KEY) !== "1") {
+    return false;
+  }
+
+  storage.removeItem(SESSION_EXPIRED_NOTICE_KEY);
+  return true;
+}
+
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [session, setSession] = useState<SessionState | null>(null);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [cart, setCart] = useState<CartSnapshotItem[]>([]);
   const [orderDraft, setOrderDraft] = useState<OrderDraft>(defaultDraft);
+  const sessionExpiresAt = session?.expiresAt ?? null;
+  const sessionRef = useRef(session);
+  const recentOrdersRef = useRef(recentOrders);
+  const cartRef = useRef(cart);
+  const orderDraftRef = useRef(orderDraft);
+  const expireSessionRef = useRef<() => void>(() => {});
+  const ensureSessionIsActiveRef = useRef<() => void>(() => {});
+
+  sessionRef.current = session;
+  recentOrdersRef.current = recentOrders;
+  cartRef.current = cart;
+  orderDraftRef.current = orderDraft;
+
+  expireSessionRef.current = () => {
+    const currentSession = sessionRef.current;
+
+    if (!currentSession) {
+      return;
+    }
+
+    const nextState = createExpiredPersistedState({
+      session: currentSession,
+      recentOrders: recentOrdersRef.current,
+      cart: cartRef.current,
+      orderDraft: orderDraftRef.current,
+    });
+
+    persistState(nextState);
+    markSessionExpiredNotice(window.sessionStorage);
+    setSession(null);
+    setRecentOrders([]);
+  };
+
+  ensureSessionIsActiveRef.current = () => {
+    if (!isSessionExpired(sessionRef.current)) {
+      return;
+    }
+
+    expireSessionRef.current();
+  };
 
   useEffect(() => {
-    const persisted = readPersistedState();
+    const rawPersisted = readPersistedState();
 
-    if (persisted) {
-      setSession(persisted.session);
-      setRecentOrders(persisted.recentOrders ?? []);
-      setCart(persisted.cart ?? []);
+    if (rawPersisted) {
+      const restored = restorePersistedState(rawPersisted);
+
+      setSession(restored.state.session);
+      setRecentOrders(restored.state.recentOrders ?? []);
+      setCart(restored.state.cart ?? []);
       setOrderDraft({
         ...defaultDraft,
-        ...(persisted.orderDraft ?? {}),
+        ...(restored.state.orderDraft ?? {}),
       });
 
-      if (persisted.session?.accessToken) {
-        void getCurrentUser(persisted.session.accessToken)
+      if (restored.expired) {
+        persistState({
+          session: null,
+          recentOrders: [],
+          cart: restored.state.cart ?? [],
+          orderDraft: {
+            ...defaultDraft,
+            ...(restored.state.orderDraft ?? {}),
+          },
+        });
+        markSessionExpiredNotice(window.sessionStorage);
+        setHydrated(true);
+        return;
+      }
+
+      if (restored.state.session?.accessToken) {
+        void getCurrentUser(restored.state.session.accessToken)
           .then((user) => {
-            setSession({
-              accessToken: persisted.session!.accessToken,
-              user,
-            });
+            setSession(replaceSessionUser(restored.state.session!, user));
             setOrderDraft((current) => ({
               ...current,
               orderedByFullName:
@@ -300,6 +447,45 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated || sessionExpiresAt === null) {
+      return;
+    }
+
+    ensureSessionIsActiveRef.current();
+
+    const timeoutId = window.setTimeout(() => {
+      expireSessionRef.current();
+    }, Math.max(sessionExpiresAt - Date.now(), 0));
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [hydrated, sessionExpiresAt]);
+
+  useEffect(() => {
+    if (!hydrated || sessionExpiresAt === null) {
+      return;
+    }
+
+    const handleFocus = () => {
+      ensureSessionIsActiveRef.current();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        ensureSessionIsActiveRef.current();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [hydrated, sessionExpiresAt]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") {
@@ -325,10 +511,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const auth = await loginB2BRequest(credentials);
       const user = await getCurrentUser(auth.accessToken);
 
-      setSession({
-        accessToken: auth.accessToken,
-        user,
-      });
+      setSession(createSessionState(auth.accessToken, user));
       setOrderDraft((current) => ({
         ...current,
         orderedByFullName: current.orderedByFullName || user.name || "",
@@ -368,10 +551,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           : {}),
       });
 
-      setSession({
-        accessToken: session.accessToken,
-        user,
-      });
+      setSession(replaceSessionUser(session, user));
       setOrderDraft((current) => ({
         ...current,
         orderedByFullName: user.name ?? "",

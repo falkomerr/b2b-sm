@@ -1,10 +1,38 @@
 import { describe, expect, test } from "bun:test";
 import {
+  SESSION_EXPIRED_NOTICE_KEY,
+  SESSION_TTL_MS,
   createClearedPersistedState,
   createCompletedOrderPersistedState,
+  createExpiredPersistedState,
+  createSessionState,
+  consumeSessionExpiredNotice,
+  isSessionExpired,
   normalizePersistedState,
+  replaceSessionUser,
+  restorePersistedState,
   writePersistedState,
 } from "./app-store.tsx";
+
+const NOW = Date.parse("2026-03-24T12:00:00.000Z");
+
+function makeUser(overrides = {}) {
+  return {
+    userId: "user-1",
+    accountType: "b2b_company",
+    name: "Иван Иванов",
+    ...overrides,
+  };
+}
+
+function makeSession(overrides = {}) {
+  return {
+    accessToken: "token",
+    expiresAt: NOW + SESSION_TTL_MS,
+    user: makeUser(),
+    ...overrides,
+  };
+}
 
 function makeOrder(overrides = {}) {
   return {
@@ -31,14 +59,7 @@ function makeOrder(overrides = {}) {
 
 describe("createClearedPersistedState", () => {
   test("clears cart items and comment while preserving session and buyer name", () => {
-    const session = {
-      accessToken: "token",
-      user: {
-        userId: "user-1",
-        accountType: "b2b_company",
-        name: "Иван Иванов",
-      },
-    };
+    const session = makeSession();
 
     expect(
       createClearedPersistedState({
@@ -71,14 +92,7 @@ describe("createClearedPersistedState", () => {
   });
 
   test("stores a completed order, clears cart, and resets comment", () => {
-    const session = {
-      accessToken: "token",
-      user: {
-        userId: "user-1",
-        accountType: "b2b_company",
-        name: "Иван Иванов",
-      },
-    };
+    const session = makeSession();
     const previousOrder = makeOrder({
       id: "order-0",
       orderedByFullName: "Иван Иванов",
@@ -122,16 +136,84 @@ describe("createClearedPersistedState", () => {
   });
 });
 
+describe("session ttl helpers", () => {
+  test("creates a session that expires exactly in ten minutes", () => {
+    const session = createSessionState("token", makeUser(), NOW);
+
+    expect(session).toEqual({
+      accessToken: "token",
+      expiresAt: NOW + SESSION_TTL_MS,
+      user: makeUser(),
+    });
+  });
+
+  test("preserves expiry when replacing the current user", () => {
+    const session = makeSession();
+
+    expect(
+      replaceSessionUser(session, makeUser({ name: "Мария Смирнова" })),
+    ).toEqual({
+      accessToken: session.accessToken,
+      expiresAt: session.expiresAt,
+      user: makeUser({ name: "Мария Смирнова" }),
+    });
+  });
+
+  test("treats missing expiry as an expired legacy session", () => {
+    expect(isSessionExpired({ accessToken: "token", user: makeUser() }, NOW)).toBe(true);
+  });
+
+  test("expires past sessions and keeps future sessions active", () => {
+    expect(isSessionExpired(makeSession({ expiresAt: NOW - 1 }), NOW)).toBe(true);
+    expect(isSessionExpired(makeSession({ expiresAt: NOW + 1 }), NOW)).toBe(false);
+  });
+});
+
+describe("createExpiredPersistedState", () => {
+  test("drops session and recent orders while keeping cart and draft", () => {
+    expect(
+      createExpiredPersistedState({
+        session: makeSession(),
+        recentOrders: [makeOrder()],
+        cart: [
+          {
+            productId: "product-1",
+            productName: "Филе",
+            unit: "piece",
+            quantity: 2,
+            quantityAvailable: 10,
+            available: true,
+          },
+        ],
+        orderDraft: {
+          orderedByFullName: "Иван Иванов",
+          comments: "Доставить утром",
+        },
+      }),
+    ).toEqual({
+      session: null,
+      recentOrders: [],
+      cart: [
+        {
+          productId: "product-1",
+          productName: "Филе",
+          unit: "piece",
+          quantity: 2,
+          quantityAvailable: 10,
+          available: true,
+        },
+      ],
+      orderDraft: {
+        orderedByFullName: "Иван Иванов",
+        comments: "Доставить утром",
+      },
+    });
+  });
+});
+
 describe("writePersistedState", () => {
   test("stores only the compact snapshot without recent orders", () => {
-    const session = {
-      accessToken: "token",
-      user: {
-        userId: "user-1",
-        accountType: "b2b_company",
-        name: "Иван Иванов",
-      },
-    };
+    const session = makeSession();
     const cart = [
       {
         productId: "product-1",
@@ -318,5 +400,105 @@ describe("normalizePersistedState", () => {
         comments: "",
       },
     });
+  });
+});
+
+describe("restorePersistedState", () => {
+  test("keeps a valid session with a future expiry", () => {
+    const session = makeSession({ expiresAt: NOW + 1 });
+
+    expect(
+      restorePersistedState(
+        {
+          session,
+          recentOrders: [makeOrder()],
+          cart: [],
+          orderDraft: {
+            orderedByFullName: "Иван Иванов",
+            comments: "",
+          },
+        },
+        NOW,
+      ),
+    ).toEqual({
+      expired: false,
+      state: {
+        session,
+        recentOrders: [makeOrder()],
+        cart: [],
+        orderDraft: {
+          orderedByFullName: "Иван Иванов",
+          comments: "",
+        },
+      },
+    });
+  });
+
+  test("clears legacy session without expiry while preserving cart and draft", () => {
+    expect(
+      restorePersistedState(
+        {
+          session: {
+            accessToken: "token",
+            user: makeUser(),
+          },
+          recentOrders: [makeOrder()],
+          cart: [
+            {
+              productId: "product-1",
+              productName: "Филе",
+              unit: "piece",
+              quantity: 2,
+              quantityAvailable: 10,
+              available: true,
+            },
+          ],
+          orderDraft: {
+            orderedByFullName: "Иван Иванов",
+            comments: "Доставить утром",
+          },
+        },
+        NOW,
+      ),
+    ).toEqual({
+      expired: true,
+      state: {
+        session: null,
+        recentOrders: [],
+        cart: [
+          {
+            productId: "product-1",
+            productName: "Филе",
+            unit: "piece",
+            quantity: 2,
+            quantityAvailable: 10,
+            available: true,
+          },
+        ],
+        orderDraft: {
+          orderedByFullName: "Иван Иванов",
+          comments: "Доставить утром",
+        },
+      },
+    });
+  });
+});
+
+describe("consumeSessionExpiredNotice", () => {
+  test("returns true once and removes the notice flag", () => {
+    const storage = {
+      value: "1",
+      getItem(key) {
+        return key === SESSION_EXPIRED_NOTICE_KEY ? this.value : null;
+      },
+      removeItem(key) {
+        if (key === SESSION_EXPIRED_NOTICE_KEY) {
+          this.value = null;
+        }
+      },
+    };
+
+    expect(consumeSessionExpiredNotice(storage)).toBe(true);
+    expect(consumeSessionExpiredNotice(storage)).toBe(false);
   });
 });
