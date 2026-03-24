@@ -412,7 +412,7 @@ function CartItemCard({
             {getCartItemMeta(item)}
           </p>
 
-          <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span
               className={[
                 "rounded-full px-2.5 py-1 text-[11px] leading-[13px] font-medium tracking-[-0.08px]",
@@ -424,15 +424,17 @@ function CartItemCard({
               {item.available ? "В наличии" : "Нет в наличии"}
             </span>
 
-            <QuantityControl
-              disabled={!item.available}
-              incrementDisabled={!canIncrementQuantity(item.quantity, item.quantityAvailable, item.unit)}
-              onChange={onQuantityChange}
-              onDecrement={onDecrement}
-              onIncrement={onIncrement}
-              quantity={item.quantity}
-              unit={item.unit}
-            />
+            <div className="max-w-full self-stretch sm:self-auto">
+              <QuantityControl
+                disabled={!item.available}
+                incrementDisabled={!canIncrementQuantity(item.quantity, item.quantityAvailable, item.unit)}
+                onChange={onQuantityChange}
+                onDecrement={onDecrement}
+                onIncrement={onIncrement}
+                quantity={item.quantity}
+                unit={item.unit}
+              />
+            </div>
           </div>
         </div>
       </div>

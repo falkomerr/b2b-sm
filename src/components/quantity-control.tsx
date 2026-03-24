@@ -34,8 +34,8 @@ export function QuantityControl({
   const quantityValue = formatQuantityValue(quantity, unit);
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="inline-flex items-center gap-2 rounded-full bg-[#f4f5f7] px-2 py-1">
+    <div className="flex max-w-full flex-wrap items-center gap-2">
+      <div className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#f4f5f7] px-2 py-1">
         <button
           type="button"
           onClick={onDecrement}
@@ -58,7 +58,7 @@ export function QuantityControl({
       </div>
 
       {isManualQuantityInputEnabled(unit) ? (
-        <label className="flex h-8 items-center gap-2 rounded-full border border-[#dfe3eb] bg-white px-3">
+        <label className="flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-[#dfe3eb] bg-white px-2.5 sm:px-3">
           <input
             type="text"
             inputMode="decimal"
@@ -83,9 +83,9 @@ export function QuantityControl({
               onChange?.(parsed);
               setInputValue(formatQuantityValue(parsed, unit));
             }}
-            className="w-14 border-none bg-transparent text-right text-[13px] font-semibold text-[#121212] outline-none"
+            className="w-12 min-w-0 border-none bg-transparent text-right text-[13px] font-semibold text-[#121212] outline-none sm:w-14"
           />
-          <span className="text-[12px] leading-4 text-[#8e8e93]">кг</span>
+          <span className="shrink-0 text-[12px] leading-4 text-[#8e8e93]">кг</span>
         </label>
       ) : null}
     </div>

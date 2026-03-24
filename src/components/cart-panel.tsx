@@ -264,19 +264,21 @@ function CartRow({
           </p>
         </div>
       </div>
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
           Без цены
         </span>
-        <QuantityControl
-          disabled={!item.available}
-          incrementDisabled={!canIncrementQuantity(item.quantity, item.quantityAvailable, item.unit)}
-          onChange={() => undefined}
-          onDecrement={onDecrement}
-          onIncrement={onIncrement}
-          quantity={item.quantity}
-          unit={item.unit}
-        />
+        <div className="max-w-full self-stretch sm:self-auto">
+          <QuantityControl
+            disabled={!item.available}
+            incrementDisabled={!canIncrementQuantity(item.quantity, item.quantityAvailable, item.unit)}
+            onChange={() => undefined}
+            onDecrement={onDecrement}
+            onIncrement={onIncrement}
+            quantity={item.quantity}
+            unit={item.unit}
+          />
+        </div>
       </div>
     </div>
   );
