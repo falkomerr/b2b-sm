@@ -137,7 +137,7 @@ describe("createClearedPersistedState", () => {
 });
 
 describe("session ttl helpers", () => {
-  test("creates a session that expires exactly in ten minutes", () => {
+  test("creates a session that expires exactly in one week", () => {
     const session = createSessionState("token", makeUser(), NOW);
 
     expect(session).toEqual({
