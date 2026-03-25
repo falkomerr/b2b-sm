@@ -9,9 +9,9 @@ import {
 describe("order acceptance window", () => {
   test("keeps the expected public copy", () => {
     expect(ORDER_ACCEPTANCE_TIMEZONE).toBe("Asia/Bishkek");
-    expect(ORDER_ACCEPTANCE_WINDOW_LABEL).toBe("06:00-24:00");
+    expect(ORDER_ACCEPTANCE_WINDOW_LABEL).toBe("06:00-00:00");
     expect(ORDER_ACCEPTANCE_CLOSED_MESSAGE).toBe(
-      "Заказы принимаются с 06:00 до 24:00 по времени Бишкека.",
+      "Заказы принимаются с 06:00 до 00:00 по времени Бишкека.",
     );
   });
 
@@ -27,7 +27,7 @@ describe("order acceptance window", () => {
     expect(isOrderAcceptanceOpen(new Date("2026-03-10T17:59:00.000Z"))).toBe(true);
   });
 
-  test("closes at 24:00 Bishkek time", () => {
+  test("closes at 00:00 Bishkek time", () => {
     expect(isOrderAcceptanceOpen(new Date("2026-03-10T18:00:00.000Z"))).toBe(false);
   });
 });
