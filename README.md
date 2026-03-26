@@ -16,17 +16,9 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Backend Modes
-
-By default the local frontend proxies API requests to the production backend via `/backend-api`.
-
-If you need to run against a local backend instead, set:
-
-```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api bun dev
-```
-
 ## Full Local Start
+
+This frontend expects the backend at `http://localhost:3001/api`.
 
 To start both frontend and backend together:
 

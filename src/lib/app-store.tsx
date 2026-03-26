@@ -4,7 +4,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -14,24 +13,13 @@ import {
   type CurrentUser,
   type Order,
   type Product,
-  authPayloadToCurrentUser,
   getCurrentUser,
   loginB2B as loginB2BRequest,
   logout as logoutRequest,
-  normalizeAssetSource,
+  resolveAssetUrl,
   updateCurrentUser as updateCurrentUserRequest,
 } from "@/lib/api";
-import {
-  createOrderAddressDraft,
-  toOrderAddressPayload,
-  type OrderAddressDraft,
-} from "@/lib/order-draft";
-import {
-  decrementQuantity,
-  getInitialQuantityForUnit,
-  incrementQuantity,
-  normalizeQuantity,
-} from "@/lib/product-units";
+import { createOrderAddressDraft, type OrderAddressDraft } from "@/lib/order-draft";
 
 type OrderDraft = {
   orderedByFullName: string;
@@ -41,7 +29,6 @@ type OrderDraft = {
 
 type SessionState = {
   accessToken: string;
-  expiresAt: number;
   user: CurrentUser;
 };
 
@@ -62,11 +49,7 @@ type AppStoreValue = {
   completeOrder: (order: Order) => void;
   clearCart: () => void;
   updateDraft: (patch: Partial<OrderDraft>) => void;
-  saveProfile: (patch: {
-    name?: string;
-    phone?: string;
-    address?: OrderAddressDraft | null;
-  }) => Promise<CurrentUser>;
+  saveProfile: (patch: { name?: string; phone?: string }) => Promise<CurrentUser>;
 };
 
 type StoreSnapshot = {
@@ -86,8 +69,6 @@ type PersistedState = {
 type CompactPersistedState = Omit<PersistedState, "recentOrders">;
 
 const STORAGE_KEY = "sm-b2b.state";
-export const SESSION_EXPIRED_NOTICE_KEY = "sm-b2b.session-expired";
-export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 const RECENT_ORDERS_LIMIT = 10;
 
 const defaultDraft: OrderDraft = {
@@ -99,71 +80,6 @@ const AppStoreContext = createContext<AppStoreValue | null>(null);
 
 function clampQuantity(quantity: number, max: number) {
   return Math.max(0, Math.min(quantity, max));
-}
-
-function normalizeCartSnapshotItem(item: CartSnapshotItem): CartSnapshotItem {
-  return {
-    ...item,
-    unit: item.unit ?? "piece",
-    imageUrl: normalizeAssetSource(item.imageUrl),
-  };
-}
-
-export function createSessionState(
-  accessToken: string,
-  user: CurrentUser,
-  now = Date.now(),
-): SessionState {
-  return {
-    accessToken,
-    expiresAt: now + SESSION_TTL_MS,
-    user,
-  };
-}
-
-export function replaceSessionUser(
-  session: SessionState,
-  user: CurrentUser,
-): SessionState {
-  return {
-    accessToken: session.accessToken,
-    expiresAt: session.expiresAt,
-    user,
-  };
-}
-
-export function isSessionExpired(
-  session: SessionState | null | undefined,
-  now = Date.now(),
-) {
-  if (!session) {
-    return false;
-  }
-
-  return !Number.isFinite(session.expiresAt) || session.expiresAt <= now;
-}
-
-export function normalizePersistedState(persisted: PersistedState): PersistedState {
-  return {
-    session: persisted.session,
-    ...(persisted.recentOrders
-        ? {
-          recentOrders: persisted.recentOrders.map((order) => ({
-            ...order,
-            items: order.items.map((item) => ({
-              ...item,
-              unit: item.unit ?? "piece",
-              imageUrl: normalizeAssetSource(item.imageUrl),
-            })),
-          })),
-        }
-      : {}),
-    cart: (persisted.cart ?? []).map(normalizeCartSnapshotItem),
-    orderDraft: {
-      ...defaultDraft,
-      ...(persisted.orderDraft ?? {}),
-    },
-  };
 }
 
 function readPersistedState(): PersistedState | null {
@@ -195,8 +111,7 @@ function createLeanCartPersistedState(snapshot: StoreSnapshot): CompactPersisted
   return {
     session: snapshot.session,
     cart: snapshot.cart.map(
-      ({ productId, productName, quantity, quantityAvailable, available, unit }) => ({
-        unit,
+      ({ productId, productName, quantity, quantityAvailable, available }) => ({
         productId,
         productName,
         quantity,
@@ -297,143 +212,36 @@ export function createCompletedOrderPersistedState(
   };
 }
 
-export function createExpiredPersistedState(
-  snapshot: StoreSnapshot,
-): StoreSnapshot {
-  return {
-    ...snapshot,
-    session: null,
-    recentOrders: [],
-  };
-}
-
-export function restorePersistedState(
-  persisted: PersistedState,
-  now = Date.now(),
-): {
-  expired: boolean;
-  state: PersistedState;
-} {
-  const normalized = normalizePersistedState(persisted);
-
-  if (!isSessionExpired(normalized.session, now)) {
-    return {
-      expired: false,
-      state: normalized,
-    };
-  }
-
-  return {
-    expired: normalized.session !== null,
-    state: createExpiredPersistedState({
-      session: normalized.session,
-      recentOrders: normalized.recentOrders ?? [],
-      cart: normalized.cart,
-      orderDraft: normalized.orderDraft,
-    }),
-  };
-}
-
-export function markSessionExpiredNotice(storage: Pick<Storage, "setItem">) {
-  storage.setItem(SESSION_EXPIRED_NOTICE_KEY, "1");
-}
-
-export function consumeSessionExpiredNotice(
-  storage: Pick<Storage, "getItem" | "removeItem">,
-) {
-  if (storage.getItem(SESSION_EXPIRED_NOTICE_KEY) !== "1") {
-    return false;
-  }
-
-  storage.removeItem(SESSION_EXPIRED_NOTICE_KEY);
-  return true;
-}
-
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [session, setSession] = useState<SessionState | null>(null);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [cart, setCart] = useState<CartSnapshotItem[]>([]);
   const [orderDraft, setOrderDraft] = useState<OrderDraft>(defaultDraft);
-  const sessionExpiresAt = session?.expiresAt ?? null;
-  const sessionRef = useRef(session);
-  const recentOrdersRef = useRef(recentOrders);
-  const cartRef = useRef(cart);
-  const orderDraftRef = useRef(orderDraft);
-  const expireSessionRef = useRef<() => void>(() => {});
-  const ensureSessionIsActiveRef = useRef<() => void>(() => {});
-
-  sessionRef.current = session;
-  recentOrdersRef.current = recentOrders;
-  cartRef.current = cart;
-  orderDraftRef.current = orderDraft;
-
-  expireSessionRef.current = () => {
-    const currentSession = sessionRef.current;
-
-    if (!currentSession) {
-      return;
-    }
-
-    const nextState = createExpiredPersistedState({
-      session: currentSession,
-      recentOrders: recentOrdersRef.current,
-      cart: cartRef.current,
-      orderDraft: orderDraftRef.current,
-    });
-
-    persistState(nextState);
-    markSessionExpiredNotice(window.sessionStorage);
-    setSession(null);
-    setRecentOrders([]);
-  };
-
-  ensureSessionIsActiveRef.current = () => {
-    if (!isSessionExpired(sessionRef.current)) {
-      return;
-    }
-
-    expireSessionRef.current();
-  };
 
   useEffect(() => {
-    const rawPersisted = readPersistedState();
+    const persisted = readPersistedState();
 
-    if (rawPersisted) {
-      const restored = restorePersistedState(rawPersisted);
-
-      setSession(restored.state.session);
-      setRecentOrders(restored.state.recentOrders ?? []);
-      setCart(restored.state.cart ?? []);
+    if (persisted) {
+      setSession(persisted.session);
+      setRecentOrders(persisted.recentOrders ?? []);
+      setCart(persisted.cart ?? []);
       setOrderDraft({
         ...defaultDraft,
-        ...(restored.state.orderDraft ?? {}),
+        ...(persisted.orderDraft ?? {}),
       });
 
-      if (restored.expired) {
-        persistState({
-          session: null,
-          recentOrders: [],
-          cart: restored.state.cart ?? [],
-          orderDraft: {
-            ...defaultDraft,
-            ...(restored.state.orderDraft ?? {}),
-          },
-        });
-        markSessionExpiredNotice(window.sessionStorage);
-        setHydrated(true);
-        return;
-      }
-
-      if (restored.state.session?.accessToken) {
-        void getCurrentUser(restored.state.session.accessToken)
+      if (persisted.session?.accessToken) {
+        void getCurrentUser(persisted.session.accessToken)
           .then((user) => {
-            setSession(replaceSessionUser(restored.state.session!, user));
+            setSession({
+              accessToken: persisted.session!.accessToken,
+              user,
+            });
             setOrderDraft((current) => ({
               ...current,
               orderedByFullName:
                 current.orderedByFullName || user.name || current.orderedByFullName,
-              address: user.address ? createOrderAddressDraft(user.address) : undefined,
             }));
           })
           .catch(() => {
@@ -448,45 +256,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
     setHydrated(true);
   }, []);
-
-  useEffect(() => {
-    if (!hydrated || sessionExpiresAt === null) {
-      return;
-    }
-
-    ensureSessionIsActiveRef.current();
-
-    const timeoutId = window.setTimeout(() => {
-      expireSessionRef.current();
-    }, Math.max(sessionExpiresAt - Date.now(), 0));
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [hydrated, sessionExpiresAt]);
-
-  useEffect(() => {
-    if (!hydrated || sessionExpiresAt === null) {
-      return;
-    }
-
-    const handleFocus = () => {
-      ensureSessionIsActiveRef.current();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        ensureSessionIsActiveRef.current();
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [hydrated, sessionExpiresAt]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") {
@@ -507,16 +276,18 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     recentOrders,
     cart,
     orderDraft,
-    cartCount: cart.length,
+    cartCount: cart.reduce((total, item) => total + item.quantity, 0),
     async login(credentials) {
       const auth = await loginB2BRequest(credentials);
-      const user = authPayloadToCurrentUser(auth);
+      const user = await getCurrentUser(auth.accessToken);
 
-      setSession(createSessionState(auth.accessToken, user));
+      setSession({
+        accessToken: auth.accessToken,
+        user,
+      });
       setOrderDraft((current) => ({
         ...current,
         orderedByFullName: current.orderedByFullName || user.name || "",
-        address: user.address ? createOrderAddressDraft(user.address) : undefined,
       }));
 
       return auth;
@@ -545,18 +316,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const user = await updateCurrentUserRequest(session.accessToken, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.phone !== undefined ? { phone: patch.phone } : {}),
-        ...(patch.address !== undefined
-          ? {
-              address: patch.address ? toOrderAddressPayload(patch.address) ?? null : null,
-            }
-          : {}),
       });
 
-      setSession(replaceSessionUser(session, user));
+      setSession({
+        accessToken: session.accessToken,
+        user,
+      });
       setOrderDraft((current) => ({
         ...current,
         orderedByFullName: user.name ?? "",
-        address: user.address ? createOrderAddressDraft(user.address) : undefined,
       }));
 
       return user;
@@ -566,16 +334,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         const existing = current.find((item) => item.productId === product.id);
 
         if (!existing) {
-          const initialQuantity = getInitialQuantityForUnit(product.unit);
           return [
             ...current,
             {
               productId: product.id,
               productName: product.name,
-              unit: product.unit,
-              imageUrl: normalizeAssetSource(product.picture),
+              imageUrl: resolveAssetUrl(product.picture),
               categoryName: product.category?.name,
-              quantity: product.available ? initialQuantity : 0,
+              quantity: product.available ? 1 : 0,
               quantityAvailable: product.quantity,
               available: product.available,
             },
@@ -588,13 +354,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
           return {
             ...item,
-            unit: product.unit,
             quantityAvailable: product.quantity,
             available: product.available,
-            quantity: clampQuantity(
-              incrementQuantity(item.quantity, product.unit),
-              product.quantity,
-            ),
+            quantity: clampQuantity(item.quantity + 1, product.quantity),
           };
         });
       });
@@ -608,7 +370,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             }
             return {
               ...item,
-              quantity: decrementQuantity(item.quantity, item.unit),
+              quantity: item.quantity - 1,
             };
           })
           .filter((item) => item.quantity > 0);
@@ -623,10 +385,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             }
             return {
               ...item,
-              quantity: clampQuantity(
-                normalizeQuantity(quantity, item.unit),
-                item.quantityAvailable || quantity,
-              ),
+              quantity: clampQuantity(quantity, item.quantityAvailable || quantity),
             };
           })
           .filter((item) => item.quantity > 0);
@@ -637,8 +396,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         order.items.map((item) => ({
           productId: item.productId,
           productName: item.productName,
-          unit: item.unit,
-          imageUrl: normalizeAssetSource(item.imageUrl),
+          imageUrl: resolveAssetUrl(item.imageUrl),
           quantity: item.quantity,
           quantityAvailable: item.quantity,
           available: true,
@@ -648,6 +406,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         ...current,
         orderedByFullName: order.orderedByFullName ?? current.orderedByFullName,
         comments: order.comments ?? "",
+        ...(order.address
+          ? {
+              address: createOrderAddressDraft(order.address),
+            }
+          : {}),
       }));
     },
     rememberOrder(order) {
