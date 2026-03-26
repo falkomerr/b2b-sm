@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { MobileAppFrame } from "@/components/mobile-app-frame";
+import { QuantityControl } from "@/components/quantity-control";
 import { appRoutes, getOrderDetailsRoute } from "@/lib/app-routes";
 import { createOrder, resolveAssetUrl, validateCart } from "@/lib/api";
 import { useAppStore } from "@/lib/app-store";
@@ -14,10 +15,15 @@ import {
   toOrderAddressPayload,
 } from "@/lib/order-draft";
 import {
+  ORDER_ACCEPTANCE_CLOSED_MESSAGE,
+  isOrderAcceptanceOpen,
+} from "@/lib/order-acceptance-window";
+import {
   getCartItemMeta,
   getSelectionCopy,
   reconcileSelectedCartIds,
 } from "@/lib/mobile-cart";
+import { canIncrementQuantity } from "@/lib/product-units";
 
 const emptyCartImageSrc = "/assets/cart/empty-cart-fish-5d8ecb.png";
 
@@ -61,7 +67,12 @@ export default function CartPage() {
   }, [cart]);
 
   const hasItems = cart.length > 0;
-  const orderAddress = createOrderAddressDraft(orderDraft.address);
+  const itemCount = cart.length;
+  const deliveryAddress = createOrderAddressDraft(session?.user.address);
+  const orderAcceptanceOpen = isOrderAcceptanceOpen();
+  const orderAcceptanceMessage = orderAcceptanceOpen
+    ? null
+    : ORDER_ACCEPTANCE_CLOSED_MESSAGE;
   const selectionCopy = getSelectionCopy({
     totalCount: cart.length,
     selectedCount: selectedProductIds.length,
@@ -82,8 +93,13 @@ export default function CartPage() {
       return;
     }
 
-    if (!hasRequiredOrderAddress(orderAddress)) {
-      setError("Укажите адрес доставки.");
+    if (!hasRequiredOrderAddress(deliveryAddress)) {
+      setError("Укажите адрес доставки в настройках профиля.");
+      return;
+    }
+
+    if (!orderAcceptanceOpen) {
+      setError(ORDER_ACCEPTANCE_CLOSED_MESSAGE);
       return;
     }
 
@@ -110,7 +126,7 @@ export default function CartPage() {
           })),
           orderedByFullName: orderDraft.orderedByFullName.trim(),
           comments: orderDraft.comments.trim() || undefined,
-          address: toOrderAddressPayload(orderAddress),
+          address: toOrderAddressPayload(deliveryAddress),
         },
         session.accessToken,
       );
@@ -173,17 +189,7 @@ export default function CartPage() {
 
   return (
     <MobileAppFrame
-      footer={
-        hasItems ? (
-          <CartFooter
-            error={error}
-            isSubmitting={isSubmitting}
-            itemCount={cart.reduce((total, item) => total + item.quantity, 0)}
-            onSubmit={handleSubmit}
-          />
-        ) : undefined
-      }
-      tabBarFixed={!hasItems}
+      tabBarFixed
       mainClassName={!hasItems ? "!pt-0 min-h-screen" : ""}
     >
       {hasItems ? (
@@ -221,6 +227,7 @@ export default function CartPage() {
                     name: item.productName,
                     price: 0,
                     currency: "KGS",
+                    unit: item.unit,
                     quantity: item.quantityAvailable || item.quantity,
                     available: item.available,
                     picture: item.imageUrl,
@@ -229,6 +236,7 @@ export default function CartPage() {
                       : undefined,
                   })
                 }
+                onQuantityChange={(quantity) => setCartQuantity(item.productId, quantity)}
                 onToggle={() =>
                   setSelectedProductIds((currentSelection) => {
                     if (currentSelection.includes(item.productId)) {
@@ -252,105 +260,30 @@ export default function CartPage() {
               Заказ оформляется по всем позициям, которые сейчас лежат в корзине.
             </p>
 
-            <div className="mt-4 grid gap-3">
-              <label className="block">
-                <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                  Город
-                </span>
-                <input
-                  value={orderAddress.city}
-                  onChange={(event) =>
-                    updateDraft({
-                      address: {
-                        ...orderAddress,
-                        city: event.target.value,
-                      },
-                    })
-                  }
-                  placeholder="Например, Бишкек"
-                  className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                />
-              </label>
+            <div className="mt-4 rounded-[22px] border border-[#ececf2] bg-white px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
+                    Адрес доставки
+                  </p>
+                  <p className="mt-1 text-[12px] leading-4 tracking-[-0.08px] text-[#8e8e93]">
+                    Адрес берется из настроек профиля и больше не заполняется при оформлении заказа.
+                  </p>
+                </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                    Улица
-                  </span>
-                  <input
-                    value={orderAddress.street}
-                    onChange={(event) =>
-                      updateDraft({
-                        address: {
-                          ...orderAddress,
-                          street: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder="Например, Манаса"
-                    className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                    Дом
-                  </span>
-                  <input
-                    value={orderAddress.building}
-                    onChange={(event) =>
-                      updateDraft({
-                        address: {
-                          ...orderAddress,
-                          building: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder="Например, 50"
-                    className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                  />
-                </label>
+                <Link
+                  href={appRoutes.account}
+                  className="inline-flex h-9 shrink-0 items-center justify-center rounded-full bg-[#eef5ff] px-4 text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1688ff]"
+                >
+                  Настроить
+                </Link>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                    Квартира
-                  </span>
-                  <input
-                    value={orderAddress.apartment}
-                    onChange={(event) =>
-                      updateDraft({
-                        address: {
-                          ...orderAddress,
-                          apartment: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder="Опционально"
-                    className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                    Этаж
-                  </span>
-                  <input
-                    value={orderAddress.floor}
-                    onChange={(event) =>
-                      updateDraft({
-                        address: {
-                          ...orderAddress,
-                          floor: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder="Опционально"
-                    className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                  />
-                </label>
-              </div>
+              <p className="mt-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212]">
+                {hasRequiredOrderAddress(deliveryAddress)
+                  ? formatAddressPreview(deliveryAddress)
+                  : "Адрес пока не указан. Заполните его в настройках профиля."}
+              </p>
             </div>
 
             <label className="mt-4 block">
@@ -379,6 +312,16 @@ export default function CartPage() {
               />
             </label>
           </section>
+
+          <CartFooter
+            availabilityMessage={orderAcceptanceMessage}
+            checkoutDisabled={!orderAcceptanceOpen}
+            inline
+            error={error}
+            isSubmitting={isSubmitting}
+            itemCount={itemCount}
+            onSubmit={handleSubmit}
+          />
         </div>
       ) : (
         <EmptyCartState />
@@ -408,7 +351,7 @@ function EmptyCartState() {
       </p>
 
       <Link
-        href={appRoutes.catalog}
+        href={appRoutes.home}
         className="mt-4 inline-flex h-[34px] items-center justify-center rounded-full bg-[#1688ff] px-[14px] text-[15px] leading-5 tracking-[-0.23px] text-white visited:!text-white hover:!text-white focus:!text-white active:!text-white no-underline"
       >
         Перейти к товарам
@@ -422,12 +365,14 @@ function CartItemCard({
   item,
   onDecrement,
   onIncrement,
+  onQuantityChange,
   onToggle,
 }: {
   checked: boolean;
   item: ReturnType<typeof useAppStore>["cart"][number];
   onDecrement: () => void;
   onIncrement: () => void;
+  onQuantityChange: (quantity: number) => void;
   onToggle: () => void;
 }) {
   const imageUrl = resolveAssetUrl(item.imageUrl);
@@ -451,7 +396,7 @@ function CartItemCard({
               alt={item.productName}
               width={78}
               height={78}
-              unoptimized
+              sizes="72px"
               className="h-[72px] w-[72px] object-contain drop-shadow-[0_10px_12px_rgba(15,23,42,0.16)]"
             />
           ) : (
@@ -467,7 +412,7 @@ function CartItemCard({
             {getCartItemMeta(item)}
           </p>
 
-          <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span
               className={[
                 "rounded-full px-2.5 py-1 text-[11px] leading-[13px] font-medium tracking-[-0.08px]",
@@ -479,13 +424,17 @@ function CartItemCard({
               {item.available ? "В наличии" : "Нет в наличии"}
             </span>
 
-            <QuantityStepper
-              disabled={!item.available}
-              onDecrement={onDecrement}
-              onIncrement={onIncrement}
-              quantity={item.quantity}
-              incrementDisabled={item.quantity >= item.quantityAvailable}
-            />
+            <div className="max-w-full self-stretch sm:self-auto">
+              <QuantityControl
+                disabled={!item.available}
+                incrementDisabled={!canIncrementQuantity(item.quantity, item.quantityAvailable, item.unit)}
+                onChange={onQuantityChange}
+                onDecrement={onDecrement}
+                onIncrement={onIncrement}
+                quantity={item.quantity}
+                unit={item.unit}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -494,22 +443,41 @@ function CartItemCard({
 }
 
 function CartFooter({
+  availabilityMessage,
+  checkoutDisabled = false,
   error,
+  inline = false,
   isSubmitting,
   itemCount,
   onSubmit,
 }: {
+  availabilityMessage?: string | null;
+  checkoutDisabled?: boolean;
   error: string | null;
+  inline?: boolean;
   isSubmitting: boolean;
   itemCount: number;
   onSubmit: () => void;
 }) {
   return (
-    <div className="border-t border-[#f0f1f5] bg-white px-4 pb-4 pt-3 shadow-[0_-14px_34px_rgba(15,23,42,0.08)]">
+    <div
+      className={[
+        "bg-white px-4 pb-4 pt-3",
+        inline
+          ? "mt-4 rounded-[28px] border border-[#f0f1f5] shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+          : "border-t border-[#f0f1f5] shadow-[0_-14px_34px_rgba(15,23,42,0.08)]",
+      ].join(" ")}
+    >
       <div className="mb-2 flex items-center justify-between text-[12px] leading-4 text-[#8e8e93]">
         <span>К оформлению</span>
         <span>{itemCount} поз.</span>
       </div>
+
+      {availabilityMessage ? (
+        <div className="mb-3 rounded-[16px] bg-[#eef5ff] px-4 py-3 text-[13px] leading-[18px] tracking-[-0.08px] text-[#2563a6]">
+          {availabilityMessage}
+        </div>
+      ) : null}
 
       {error ? (
         <div className="mb-3 rounded-[16px] bg-[#fff2f2] px-4 py-3 text-[13px] leading-[18px] tracking-[-0.08px] text-[#bf4d4d]">
@@ -520,48 +488,10 @@ function CartFooter({
       <button
         type="button"
         onClick={onSubmit}
-        disabled={isSubmitting}
+        disabled={isSubmitting || checkoutDisabled}
         className="flex h-[48px] w-full items-center justify-center rounded-full bg-[#1688ff] text-[16px] leading-[19px] font-semibold tracking-[-0.38px] text-white transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[#9bcbff]"
       >
         {isSubmitting ? "Отправляем заказ..." : "Оформить заказ"}
-      </button>
-    </div>
-  );
-}
-
-function QuantityStepper({
-  disabled,
-  incrementDisabled,
-  onDecrement,
-  onIncrement,
-  quantity,
-}: {
-  disabled: boolean;
-  incrementDisabled: boolean;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  quantity: number;
-}) {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-[#f4f5f7] px-2 py-1">
-      <button
-        type="button"
-        onClick={onDecrement}
-        disabled={disabled}
-        className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[16px] leading-none text-[#121212] shadow-[0_4px_10px_rgba(15,23,42,0.08)] disabled:text-[#c6c7cf]"
-      >
-        -
-      </button>
-      <span className="min-w-[16px] text-center text-[14px] leading-[17px] font-semibold tracking-[-0.15px] text-[#121212]">
-        {quantity}
-      </span>
-      <button
-        type="button"
-        onClick={onIncrement}
-        disabled={disabled || incrementDisabled}
-        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1688ff] text-[16px] leading-none text-white disabled:bg-[#cfe4fb]"
-      >
-        +
       </button>
     </div>
   );
@@ -588,4 +518,15 @@ function SelectionCheckbox({ checked }: { checked: boolean }) {
       </svg>
     </span>
   );
+}
+
+function formatAddressPreview(address: ReturnType<typeof createOrderAddressDraft>) {
+  return [
+    address.city.trim(),
+    `${address.street.trim()} ${address.building.trim()}`.trim(),
+    address.apartment.trim() ? `кв. ${address.apartment.trim()}` : "",
+    address.floor.trim() ? `этаж ${address.floor.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
 }

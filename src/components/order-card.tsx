@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getOrderDetailsRoute } from "@/lib/app-routes";
 import type { Order } from "@/lib/api";
+import { formatQuantity } from "@/lib/product-units";
 
 const statusMap: Record<string, string> = {
   N: "Новый",
@@ -45,7 +46,7 @@ export function OrderCard({
           </h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Оформил: {order.orderedByFullName ?? "Не указан"} · Позиций:{" "}
-            {order.items.reduce((total, item) => total + item.quantity, 0)}
+            {order.items.length}
           </p>
         </div>
 
@@ -93,7 +94,7 @@ export function OrderCard({
           >
             <p className="text-sm font-semibold">{item.productName}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
-              {item.quantity} шт.
+              {formatQuantity(item.quantity, item.unit)}
             </p>
           </div>
         ))}
