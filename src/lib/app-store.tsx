@@ -35,6 +35,7 @@ import {
 
 type OrderDraft = {
   orderedByFullName: string;
+  orderedByFullNameSource?: "manual";
   comments: string;
   address?: OrderAddressDraft;
 };
@@ -124,6 +125,23 @@ export function resolveOrderedByFullName(
   }
 
   return userName;
+}
+
+export function resolveCheckoutOrderedByFullName(
+  currentOrderedByFullName: string | null | undefined,
+  {
+    hasDraftItems = false,
+    source,
+  }: {
+    hasDraftItems?: boolean;
+    source?: "manual" | null;
+  } = {},
+) {
+  if (!hasDraftItems || source !== "manual") {
+    return "";
+  }
+
+  return currentOrderedByFullName?.trim() ?? "";
 }
 
 function clampQuantity(quantity: number, max: number) {
@@ -303,7 +321,7 @@ export function createClearedPersistedState(
     ...snapshot,
     cart: [],
     orderDraft: {
-      ...snapshot.orderDraft,
+      ...defaultDraft,
       comments: "",
     },
   };
@@ -318,9 +336,7 @@ export function createCompletedOrderPersistedState(
     recentOrders: mergeRecentOrders(snapshot.recentOrders ?? [], order),
     cart: [],
     orderDraft: {
-      ...snapshot.orderDraft,
-      orderedByFullName:
-        order.orderedByFullName ?? snapshot.orderDraft.orderedByFullName,
+      ...defaultDraft,
       comments: "",
     },
   };
@@ -460,9 +476,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             setSession(replaceSessionUser(restored.state.session!, user));
             setOrderDraft((current) => ({
               ...current,
-              orderedByFullName: resolveOrderedByFullName(
+              orderedByFullName: resolveCheckoutOrderedByFullName(
                 current.orderedByFullName,
-                user,
+                {
+                  hasDraftItems: Boolean(restored.state.cart?.length),
+                  source: current.orderedByFullNameSource,
+                },
               ),
               address: user.address ? createOrderAddressDraft(user.address) : undefined,
             }));
@@ -546,9 +565,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setSession(createSessionState(auth.accessToken, user));
       setOrderDraft((current) => ({
         ...current,
-        orderedByFullName: resolveOrderedByFullName(
+        orderedByFullName: resolveCheckoutOrderedByFullName(
           current.orderedByFullName,
-          user,
+          {
+            hasDraftItems: Boolean(cart.length),
+            source: current.orderedByFullNameSource,
+          },
         ),
         address: user.address ? createOrderAddressDraft(user.address) : undefined,
       }));
@@ -589,7 +611,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setSession(replaceSessionUser(session, user));
       setOrderDraft((current) => ({
         ...current,
-        orderedByFullName: resolveOrderedByFullName("", user),
+        orderedByFullName: resolveCheckoutOrderedByFullName(
+          current.orderedByFullName,
+          {
+            hasDraftItems: Boolean(cart.length),
+            source: current.orderedByFullNameSource,
+          },
+        ),
         address: user.address ? createOrderAddressDraft(user.address) : undefined,
       }));
 
@@ -680,7 +708,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       );
       setOrderDraft((current) => ({
         ...current,
-        orderedByFullName: order.orderedByFullName ?? current.orderedByFullName,
+        orderedByFullName: "",
+        orderedByFullNameSource: undefined,
         comments: order.comments ?? "",
       }));
     },
@@ -719,10 +748,22 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       }));
     },
     updateDraft(patch) {
-      setOrderDraft((current) => ({
-        ...current,
-        ...patch,
-      }));
+      setOrderDraft((current) => {
+        const nextDraft: OrderDraft = {
+          ...current,
+          ...patch,
+        };
+
+        if (patch.orderedByFullName !== undefined) {
+          if (patch.orderedByFullName.trim()) {
+            nextDraft.orderedByFullNameSource = "manual";
+          } else {
+            delete nextDraft.orderedByFullNameSource;
+          }
+        }
+
+        return nextDraft;
+      });
     },
   };
 

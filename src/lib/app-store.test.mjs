@@ -5,6 +5,7 @@ import {
   createClearedPersistedState,
   createCompletedOrderPersistedState,
   createExpiredPersistedState,
+  resolveCheckoutOrderedByFullName,
   createSessionState,
   consumeSessionExpiredNotice,
   isSessionExpired,
@@ -59,7 +60,7 @@ function makeOrder(overrides = {}) {
 }
 
 describe("createClearedPersistedState", () => {
-  test("clears cart items and comment while preserving session and buyer name", () => {
+  test("clears cart items and resets checkout buyer draft", () => {
     const session = makeSession();
 
     expect(
@@ -86,13 +87,13 @@ describe("createClearedPersistedState", () => {
       recentOrders: [makeOrder()],
       cart: [],
       orderDraft: {
-        orderedByFullName: "Иван Иванов",
+        orderedByFullName: "",
         comments: "",
       },
     });
   });
 
-  test("stores a completed order, clears cart, and resets comment", () => {
+  test("stores a completed order and resets the next checkout draft", () => {
     const session = makeSession();
     const previousOrder = makeOrder({
       id: "order-0",
@@ -130,7 +131,7 @@ describe("createClearedPersistedState", () => {
       recentOrders: [completedOrder, previousOrder],
       cart: [],
       orderDraft: {
-        orderedByFullName: "Мария Смирнова",
+        orderedByFullName: "",
         comments: "",
       },
     });
@@ -193,6 +194,29 @@ describe("resolveOrderedByFullName", () => {
         }),
       ),
     ).toBe("Иван Иванов");
+  });
+});
+
+describe("resolveCheckoutOrderedByFullName", () => {
+  test("keeps checkout buyer name empty by default", () => {
+    expect(resolveCheckoutOrderedByFullName("")).toBe("");
+  });
+
+  test("preserves an explicitly entered checkout buyer name for an active draft", () => {
+    expect(
+      resolveCheckoutOrderedByFullName("Иван Иванов", {
+        hasDraftItems: true,
+        source: "manual",
+      }),
+    ).toBe("Иван Иванов");
+  });
+
+  test("clears a legacy persisted checkout buyer name without a manual source marker", () => {
+    expect(
+      resolveCheckoutOrderedByFullName("B2B Demo", {
+        hasDraftItems: true,
+      }),
+    ).toBe("");
   });
 });
 
