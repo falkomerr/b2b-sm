@@ -1,8 +1,13 @@
 import { resolveAssetUrl, type Product } from "./api";
 
-export function selectHomeProducts(products: Product[], limit = 4) {
-  return [...products]
+export function selectHomeProducts(products: Product[], limit?: number): Product[] {
+  const sortedProducts = products
+    .filter((product) => Boolean(resolveAssetUrl(product.picture)))
     .sort((left, right) => {
+      if (Number(Boolean(right.isB2bFeatured)) !== Number(Boolean(left.isB2bFeatured))) {
+        return Number(Boolean(right.isB2bFeatured)) - Number(Boolean(left.isB2bFeatured));
+      }
+
       const leftHasImage = Number(Boolean(resolveAssetUrl(left.picture)));
       const rightHasImage = Number(Boolean(resolveAssetUrl(right.picture)));
 
@@ -19,6 +24,11 @@ export function selectHomeProducts(products: Product[], limit = 4) {
       }
 
       return left.name.localeCompare(right.name, "ru");
-    })
-    .slice(0, limit);
+    });
+
+  if (typeof limit !== "number") {
+    return sortedProducts;
+  }
+
+  return sortedProducts.slice(0, Math.max(0, limit));
 }
