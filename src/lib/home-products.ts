@@ -2,17 +2,17 @@ import { resolveAssetUrl, type Product } from "./api";
 
 export function selectHomeProducts(products: Product[], limit?: number): Product[] {
   const sortedProducts = products
-    .filter((product) => Boolean(resolveAssetUrl(product.picture)))
+    .slice()
     .sort((left, right) => {
-      if (Number(Boolean(right.isB2bFeatured)) !== Number(Boolean(left.isB2bFeatured))) {
-        return Number(Boolean(right.isB2bFeatured)) - Number(Boolean(left.isB2bFeatured));
-      }
-
       const leftHasImage = Number(Boolean(resolveAssetUrl(left.picture)));
       const rightHasImage = Number(Boolean(resolveAssetUrl(right.picture)));
 
       if (rightHasImage !== leftHasImage) {
         return rightHasImage - leftHasImage;
+      }
+
+      if (Number(Boolean(right.isB2bFeatured)) !== Number(Boolean(left.isB2bFeatured))) {
+        return Number(Boolean(right.isB2bFeatured)) - Number(Boolean(left.isB2bFeatured));
       }
 
       if (Number(right.available) !== Number(left.available)) {

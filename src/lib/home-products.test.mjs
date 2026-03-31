@@ -58,7 +58,7 @@ describe("selectHomeProducts", () => {
     ]);
   });
 
-  test("returns all pictured products when limit is omitted", () => {
+  test("keeps products without images after pictured products when limit is omitted", () => {
     const products = [
       {
         id: "no-image",
@@ -112,8 +112,56 @@ describe("selectHomeProducts", () => {
       "with-image-c",
       "with-image-b",
       "unavailable-with-image",
+      "no-image",
     ]);
   });
+
+  test("includes products without images when pictured products are exhausted by limit", () => {
+    const products = [
+      {
+        id: "with-image-a",
+        name: "С картинкой A",
+        picture: "/products/a.jpg",
+        price: 0,
+        currency: "KGS",
+        quantity: 7,
+        available: true,
+      },
+      {
+        id: "with-image-b",
+        name: "С картинкой B",
+        picture: "/products/b.jpg",
+        price: 0,
+        currency: "KGS",
+        quantity: 2,
+        available: true,
+      },
+      {
+        id: "no-image-featured",
+        name: "Без картинки, но важный",
+        price: 0,
+        currency: "KGS",
+        quantity: 9,
+        available: true,
+        isB2bFeatured: true,
+      },
+      {
+        id: "no-image-regular",
+        name: "Без картинки обычный",
+        price: 0,
+        currency: "KGS",
+        quantity: 4,
+        available: true,
+      },
+    ];
+
+    expect(selectHomeProducts(products, 3).map((product) => product.id)).toEqual([
+      "with-image-a",
+      "with-image-b",
+      "no-image-featured",
+    ]);
+  });
+
   test("returns an empty list when limit is zero", () => {
     const products = [
       {
