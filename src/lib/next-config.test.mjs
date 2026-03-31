@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import nextConfig from "../../next.config.ts";
 
 describe("next.config", () => {
-  test("proxies backend asset requests to the production backend", async () => {
+  test("proxies backend asset requests to the live production asset backend", async () => {
     expect(typeof nextConfig.rewrites).toBe("function");
 
     const rewrites = await nextConfig.rewrites();
@@ -10,7 +10,7 @@ describe("next.config", () => {
     expect(rewrites).toEqual([
       {
         source: "/backend-assets/:path*",
-        destination: "https://land.smartforel.com/:path*",
+        destination: "https://sm-landing-backend-falkomerr.dev.smartforel.com/:path*",
       },
     ]);
   });
@@ -21,6 +21,11 @@ describe("next.config", () => {
         {
           protocol: "https",
           hostname: "land.smartforel.com",
+          pathname: "/**",
+        },
+        {
+          protocol: "https",
+          hostname: "sm-landing-backend-falkomerr.dev.smartforel.com",
           pathname: "/**",
         },
         {
