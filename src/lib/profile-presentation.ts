@@ -50,5 +50,5 @@ export function formatOrderStatusTone(statusId: string): OrderStatusTone {
 }
 
 export function getOrderItemCount(order: Pick<Order, "items">) {
-  return order.items.length;
+  return order.items.reduce((total, item) => total + item.quantity, 0);
 }

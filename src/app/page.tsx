@@ -4,12 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MobileAppFrame } from "@/components/mobile-app-frame";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { appRoutes } from "@/lib/app-routes";
 import { getProducts, resolveAssetUrl, type Product } from "@/lib/api";
 import { useAppStore } from "@/lib/app-store";
 import { selectHomeProducts } from "@/lib/home-products";
-import { ORDER_ACCEPTANCE_WINDOW_LABEL } from "@/lib/order-acceptance-window";
 
 const fontFamily =
   'SF Pro Text, SF Pro Display, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -43,7 +42,7 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
 
-    void getProducts({ b2bFeaturedFirst: true })
+    void getProducts({})
       .then((loadedProducts) => {
         if (!active) {
           return;
@@ -92,43 +91,51 @@ export default function HomePage() {
   }
 
   return (
-    <MobileAppFrame mainClassName="px-3 pt-5">
-      <NoticeCard />
+    <div className="min-h-screen bg-[#f4f5f7]" style={{ fontFamily }}>
+      <div className="mx-auto flex min-h-screen w-full max-w-[392px] flex-col bg-white sm:my-5 sm:min-h-[852px] sm:overflow-hidden sm:rounded-[44px] sm:shadow-[0_28px_90px_rgba(18,18,18,0.14)]">
+        <main className="flex-1 overflow-y-auto px-3 pb-6 pt-5">
+          <NoticeCard />
 
-      <section className="mt-4">
-        {loading ? (
-          <div className="grid grid-cols-2 gap-4">
-            {Array.from({ length: 4 }, (_, index) => (
-              <HomeProductCardSkeleton key={`home-skeleton-${index}`} />
-            ))}
-          </div>
-        ) : error ? (
-          <div className="rounded-[26px] bg-[#fff3f3] px-4 py-5 text-[13px] leading-[18px] text-[#bf4d4d]">
-            {error}
-          </div>
-        ) : products.length ? (
-          <div className="grid grid-cols-2 gap-4">
-            {products.map((product) => {
-              const quantityInCart =
-                cart.find((item) => item.productId === product.id)?.quantity ?? 0;
+          <section className="mt-4">
+            {loading ? (
+              <div className="grid grid-cols-2 gap-4">
+                {Array.from({ length: 4 }, (_, index) => (
+                  <HomeProductCardSkeleton key={`home-skeleton-${index}`} />
+                ))}
+              </div>
+            ) : error ? (
+              <div className="rounded-[26px] bg-[#fff3f3] px-4 py-5 text-[13px] leading-[18px] text-[#bf4d4d]">
+                {error}
+              </div>
+            ) : products.length ? (
+              <div className="grid grid-cols-2 gap-4">
+                {products.map((product) => {
+                  const quantityInCart =
+                    cart.find((item) => item.productId === product.id)?.quantity ?? 0;
 
-              return (
-                <HomeProductCard
-                  key={product.id}
-                  product={product}
-                  quantityInCart={quantityInCart}
-                  onAdd={() => addProduct(product)}
-                />
-              );
-            })}
-          </div>
-        ) : (
-          <div className="rounded-[26px] bg-[#f4f4fb] px-4 py-5 text-[13px] leading-[18px] text-[#7f8089]">
-            Товары для главной страницы пока недоступны.
-          </div>
-        )}
-      </section>
-    </MobileAppFrame>
+                  return (
+                    <HomeProductCard
+                      key={product.id}
+                      product={product}
+                      quantityInCart={quantityInCart}
+                      onAdd={() => addProduct(product)}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-[26px] bg-[#f4f4fb] px-4 py-5 text-[13px] leading-[18px] text-[#7f8089]">
+                Товары для главной страницы пока недоступны.
+              </div>
+            )}
+          </section>
+        </main>
+
+        <div className="flex justify-center pb-0 pt-3">
+          <MobileTabBar />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -141,16 +148,27 @@ function NoticeCard() {
             Обратите внимание
           </h1>
           <p className="mt-1 text-[13px] leading-[17px] tracking-[-0.08px] text-[#8a8b94]">
-            Заказы принимаются ежедневно
+            Заказы принимаются
             <br />
-            с {ORDER_ACCEPTANCE_WINDOW_LABEL} по Бишкеку
+            с определенного периода
           </p>
         </div>
 
-        <span className="mt-0.5 inline-flex h-7 items-center justify-center rounded-full bg-[#e6e6ed] px-3 text-[11px] leading-[13px] font-semibold tracking-[-0.08px] text-[#5a5b66]">
-          {ORDER_ACCEPTANCE_WINDOW_LABEL}
-        </span>
+        <button
+          type="button"
+          aria-label="Закрыть уведомление"
+          className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#e6e6ed] text-[#9898a3]"
+        >
+          <CloseSmallIcon />
+        </button>
       </div>
+
+      <button
+        type="button"
+        className="mt-4 inline-flex h-[34px] items-center justify-center rounded-full bg-[#1688ff] px-4 text-[14px] leading-[17px] font-semibold tracking-[-0.15px] text-white"
+      >
+        Уточнить период
+      </button>
     </section>
   );
 }
@@ -175,7 +193,7 @@ function HomeProductCard({
             alt={product.name}
             width={112}
             height={112}
-            sizes="(max-width: 640px) 100px, 112px"
+            unoptimized
             className="h-[100px] w-[100px] object-contain"
           />
         ) : (
@@ -244,5 +262,22 @@ function SalmonPackArt() {
       <div className="absolute bottom-[7px] left-[8px] h-[10px] w-[22px] rounded-[999px] bg-[#ff6c1d]" />
       <div className="absolute bottom-[8px] right-[8px] h-[12px] w-[20px] rounded-[999px] bg-[#ffc06b]" />
     </div>
+  );
+}
+
+function CloseSmallIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 12 12"
+      className="h-3 w-3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    >
+      <path d="M2 2 10 10" />
+      <path d="M10 2 2 10" />
+    </svg>
   );
 }

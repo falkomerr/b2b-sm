@@ -4,7 +4,7 @@ import { startTransition, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { appRoutes } from "@/lib/app-routes";
-import { consumeSessionExpiredNotice, useAppStore } from "@/lib/app-store";
+import { useAppStore } from "@/lib/app-store";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,7 +12,6 @@ export default function LoginPage() {
   const [form, setForm] = useState({ login: "", password: "" });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const fontFamily =
     'SF Pro Text, SF Pro Display, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -23,23 +22,10 @@ export default function LoginPage() {
     }
   }, [hydrated, router, session]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    setNotice(
-      consumeSessionExpiredNotice(window.sessionStorage)
-        ? "Сессия истекла. Войдите снова."
-        : null,
-    );
-  }, []);
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
-    setNotice(null);
 
     try {
       await login({
@@ -127,12 +113,6 @@ export default function LoginPage() {
               {error ? (
                 <div className="px-1 text-[13px] leading-[18px] text-[#d14343]">
                   {error}
-                </div>
-              ) : null}
-
-              {notice ? (
-                <div className="px-1 text-[13px] leading-[18px] text-[#3b82f6]">
-                  {notice}
                 </div>
               ) : null}
 

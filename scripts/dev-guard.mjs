@@ -146,32 +146,6 @@ export function archiveIncompatibleNextBuildForDev({
   };
 }
 
-export function archiveExistingNextBuild({
-  projectRoot,
-  now = Date.now,
-  exists = existsSync,
-  rename = renameSync,
-}) {
-  const nextDir = path.join(projectRoot, ".next");
-
-  if (!exists(nextDir)) {
-    return null;
-  }
-
-  const archivedNextDir = createArchivedNextDir({
-    projectRoot,
-    exists,
-    now,
-  });
-
-  rename(nextDir, archivedNextDir);
-
-  return {
-    nextDir,
-    archivedNextDir,
-  };
-}
-
 export function listWorkspaceProcesses({ run = defaultRun } = {}) {
   const psResult = run("ps", ["-Ao", "pid=,command="]);
 
