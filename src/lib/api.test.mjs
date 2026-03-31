@@ -1,20 +1,24 @@
 import { describe, expect, test } from "bun:test";
-import { resolveApiBaseUrl, resolveAssetUrl } from "./api.ts";
+import { normalizeAssetSource, resolveApiBaseUrl, resolveAssetUrl } from "./api.ts";
 
 const DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0W8AAAAASUVORK5CYII=";
 
 describe("resolveAssetUrl", () => {
-  test("keeps data URLs unchanged", () => {
-    expect(resolveAssetUrl(DATA_URL)).toBe(DATA_URL);
+  test("drops inline data URLs", () => {
+    expect(resolveAssetUrl(DATA_URL)).toBeUndefined();
   });
 
-  test("resolves relative asset paths against backend origin", () => {
+  test("drops blob URLs", () => {
+    expect(resolveAssetUrl("blob:https://b2b.smartforel.com/product-image")).toBeUndefined();
+  });
+
+  test("resolves relative asset paths through same-origin asset proxy by default", () => {
     expect(resolveAssetUrl("/products/item.jpg")).toBe(
-      "http://localhost:3001/products/item.jpg",
+      "/backend-assets/static/products/item.webp",
     );
     expect(resolveAssetUrl("products/item.jpg")).toBe(
-      "http://localhost:3001/products/item.jpg",
+      "/backend-assets/static/products/item.webp",
     );
   });
 
@@ -22,6 +26,20 @@ describe("resolveAssetUrl", () => {
     expect(resolveAssetUrl("   ")).toBeUndefined();
     expect(resolveAssetUrl(null)).toBeUndefined();
     expect(resolveAssetUrl(undefined)).toBeUndefined();
+  });
+});
+
+describe("normalizeAssetSource", () => {
+  test("normalizes legacy product asset paths to static webp", () => {
+    expect(normalizeAssetSource("/products/item.jpg")).toBe("/static/products/item.webp");
+    expect(normalizeAssetSource("https://land.smartforel.com/products/item.JPG")).toBe(
+      "/static/products/item.webp",
+    );
+  });
+
+  test("drops inline and blob asset sources", () => {
+    expect(normalizeAssetSource(DATA_URL)).toBeUndefined();
+    expect(normalizeAssetSource("blob:https://b2b.smartforel.com/product-image")).toBeUndefined();
   });
 });
 
@@ -52,11 +70,19 @@ describe("resolveApiBaseUrl", () => {
 });
 
 describe("resolveAssetUrl on public hosts", () => {
-  test("resolves relative asset paths against production backend", () => {
+  test("resolves relative asset paths through same-origin asset proxy", () => {
     expect(
       resolveAssetUrl("/products/item.jpg", {
         browserHost: "b2b.smartforel.com",
       }),
-    ).toBe("https://land.smartforel.com/products/item.jpg");
+    ).toBe("/backend-assets/static/products/item.webp");
+  });
+
+  test("proxies absolute backend asset URLs on public hosts", () => {
+    expect(
+      resolveAssetUrl("https://land.smartforel.com/products/item.jpg", {
+        browserHost: "b2b.smartforel.com",
+      }),
+    ).toBe("/backend-assets/static/products/item.webp");
   });
 });

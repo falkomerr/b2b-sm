@@ -102,7 +102,9 @@ type CurrentUserPayload = Omit<CurrentUser, "userId"> & {
 const LOCAL_API_BASE_URL = "http://localhost:3001/api";
 const PRODUCTION_API_BASE_URL = "https://land.smartforel.com/api";
 const PUBLIC_API_PROXY_PATH = "/backend-api";
-const ALLOWED_ASSET_PROTOCOLS = new Set(["http:", "https:", "data:", "blob:"]);
+const PUBLIC_ASSET_PROXY_PATH = "/backend-assets";
+const ALLOWED_ASSET_PROTOCOLS = new Set(["http:", "https:"]);
+const LEGACY_PRODUCT_ASSET_PATTERN = /^\/?(?:static\/)?products\/([^/?#]+)$/i;
 
 type ApiRuntimeOptions = {
   configuredApiBaseUrl?: string | null;
@@ -168,6 +170,55 @@ function resolveBackendOrigin({
   return new URL(LOCAL_API_BASE_URL).origin;
 }
 
+function resolveAssetBaseUrl({
+  configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
+  browserHost = getBrowserLocation()?.hostname,
+  browserOrigin = getBrowserLocation()?.origin,
+}: ApiRuntimeOptions = {}) {
+  if (!isLocalBrowserHost(browserHost)) {
+    return PUBLIC_ASSET_PROXY_PATH;
+  }
+
+  const normalizedApiBaseUrl = configuredApiBaseUrl?.trim();
+
+  if (normalizedApiBaseUrl) {
+    try {
+      return new URL(normalizedApiBaseUrl).origin;
+    } catch {
+      if (browserOrigin) {
+        return new URL(normalizedApiBaseUrl, `${browserOrigin}/`).origin;
+      }
+    }
+  }
+
+  return PUBLIC_ASSET_PROXY_PATH;
+}
+
+function normalizeLegacyProductAssetPath(pathname: string) {
+  const match = pathname.match(LEGACY_PRODUCT_ASSET_PATTERN);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const baseName = decodeURIComponent(match[1]).replace(/\.[^.]+$/, "");
+  return `/static/products/${baseName}.webp`;
+}
+
+function joinBaseUrl(baseUrl: string, path: string) {
+  const normalizedPath = path.replace(/^\/+/, "");
+
+  try {
+    return new URL(normalizedPath, `${baseUrl.replace(/\/+$/, "")}/`).toString();
+  } catch {
+    return `${baseUrl.replace(/\/+$/, "")}/${normalizedPath}`;
+  }
+}
+
+function toPublicAssetProxyPath(pathname: string, search = "", hash = "") {
+  return joinBaseUrl(PUBLIC_ASSET_PROXY_PATH, pathname) + search + hash;
+}
+
 function resolveApiUrl(
   path: string,
   params?: URLSearchParams,
@@ -193,11 +244,7 @@ export function resolveAssetUrl(
   source?: string | null,
   options?: ApiRuntimeOptions,
 ) {
-  if (!source) {
-    return undefined;
-  }
-
-  const normalizedSource = source.trim();
+  const normalizedSource = normalizeAssetSource(source);
 
   if (!normalizedSource) {
     return undefined;
@@ -207,6 +254,17 @@ export function resolveAssetUrl(
     const absoluteUrl = new URL(normalizedSource);
 
     if (ALLOWED_ASSET_PROTOCOLS.has(absoluteUrl.protocol)) {
+      if (
+        !isLocalBrowserHost(options?.browserHost ?? getBrowserLocation()?.hostname) &&
+        absoluteUrl.origin === resolveBackendOrigin(options)
+      ) {
+        return toPublicAssetProxyPath(
+          absoluteUrl.pathname,
+          absoluteUrl.search,
+          absoluteUrl.hash,
+        );
+      }
+
       return absoluteUrl.toString();
     }
 
@@ -214,10 +272,34 @@ export function resolveAssetUrl(
   } catch {}
 
   try {
-    return new URL(normalizedSource, `${resolveBackendOrigin(options)}/`).toString();
+    return joinBaseUrl(resolveAssetBaseUrl(options), normalizedSource);
   } catch {
     return undefined;
   }
+}
+
+export function normalizeAssetSource(source?: string | null) {
+  if (!source) {
+    return undefined;
+  }
+
+  const trimmedSource = source.trim();
+
+  if (!trimmedSource) {
+    return undefined;
+  }
+
+  try {
+    const absoluteUrl = new URL(trimmedSource);
+
+    if (!ALLOWED_ASSET_PROTOCOLS.has(absoluteUrl.protocol)) {
+      return undefined;
+    }
+
+    return normalizeLegacyProductAssetPath(absoluteUrl.pathname) ?? absoluteUrl.toString();
+  } catch {}
+
+  return normalizeLegacyProductAssetPath(trimmedSource) ?? trimmedSource;
 }
 
 function extractErrorMessage(payload: unknown, fallback: string) {
