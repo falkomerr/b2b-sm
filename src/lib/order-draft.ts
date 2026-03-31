@@ -40,16 +40,6 @@ export function hasRequiredOrderAddress(address: OrderAddressDraft) {
   );
 }
 
-export function isEmptyOrderAddress(address: OrderAddressDraft) {
-  return !(
-    address.street.trim()
-    || address.building.trim()
-    || address.apartment.trim()
-    || address.floor.trim()
-    || address.city.trim()
-  );
-}
-
 export function toOrderAddressPayload(address: OrderAddressDraft) {
   const street = address.street.trim();
   const building = address.building.trim();

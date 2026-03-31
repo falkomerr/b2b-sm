@@ -15,15 +15,10 @@
 
 # next.js
 /.next/
-/.next.*
 /out/
 
 # production
 /build
-
-# local agent/runtime artifacts
-/.omx/
-/.next.stale*/
 
 # misc
 .DS_Store
