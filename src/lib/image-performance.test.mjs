@@ -15,6 +15,14 @@ describe("image performance regressions", () => {
     expect(homePageSource).toContain("setProducts(selectHomeProducts(loadedProducts));");
   });
 
+  test("home page fetches products by access token instead of the whole session object", () => {
+    const homePageSource = readProjectFile("src/app/page.tsx");
+
+    expect(homePageSource).toContain("const accessToken = session?.accessToken;");
+    expect(homePageSource).toContain("if (!hydrated || !accessToken) {");
+    expect(homePageSource).toContain("}, [accessToken, hydrated]);");
+  });
+
   test("product image surfaces keep Next.js optimization enabled", () => {
     const files = [
       "src/app/page.tsx",

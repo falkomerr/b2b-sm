@@ -17,6 +17,7 @@ const fontFamily =
 export default function HomePage() {
   const router = useRouter();
   const { addProduct, cart, hydrated, session } = useAppStore();
+  const accessToken = session?.accessToken;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export default function HomePage() {
   }, [hydrated, router, session]);
 
   useEffect(() => {
-    if (!hydrated || !session) {
+    if (!hydrated || !accessToken) {
       return;
     }
 
@@ -71,7 +72,7 @@ export default function HomePage() {
     return () => {
       active = false;
     };
-  }, [hydrated, session]);
+  }, [accessToken, hydrated]);
 
   if (!hydrated || !session) {
     return (
