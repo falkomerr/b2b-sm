@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun scripts/dev.mjs",
     "dev:full": "bun scripts/dev-full.mjs",
-    "build": "next build",
+    "build": "bun scripts/build.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"

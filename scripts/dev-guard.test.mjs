@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, test } from "bun:test";
 import {
   acquireDevLock,
+  archiveExistingNextBuild,
   archiveIncompatibleNextBuildForDev,
   findConflictingDevServer,
   findIncompatibleNextBuild,
@@ -154,6 +155,32 @@ describe("archiveIncompatibleNextBuildForDev", () => {
       expect(archived?.archivedNextDir).toBe(path.join(tempDir, ".next.stale.42-1"));
       expect(existsSync(nextDir)).toBe(false);
       expect(existsSync(path.join(tempDir, ".next.stale.42-1", "server", "app", "page.js"))).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("archiveExistingNextBuild", () => {
+  test("moves any existing .next directory into a unique stale directory", () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "sm-b2b-build-"));
+    const nextDir = path.join(tempDir, ".next");
+    const markerPath = path.join(nextDir, "trace");
+    const existingArchive = path.join(tempDir, ".next.stale.42");
+
+    try {
+      mkdirSync(nextDir, { recursive: true });
+      mkdirSync(existingArchive, { recursive: true });
+      writeFileSync(markerPath, "build-cache", "utf8");
+
+      const archived = archiveExistingNextBuild({
+        projectRoot: tempDir,
+        now: () => 42000,
+      });
+
+      expect(archived?.archivedNextDir).toBe(path.join(tempDir, ".next.stale.42-1"));
+      expect(existsSync(nextDir)).toBe(false);
+      expect(existsSync(path.join(tempDir, ".next.stale.42-1", "trace"))).toBe(true);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
