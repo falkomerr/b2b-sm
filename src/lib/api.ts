@@ -32,6 +32,7 @@ export type Product = {
   picture?: string;
   quantity: number;
   available: boolean;
+  isB2bFeatured?: boolean;
   category?: Category;
 };
 
