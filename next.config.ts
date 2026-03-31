@@ -1,12 +1,41 @@
 import type { NextConfig } from "next";
 
+const PRODUCTION_BACKEND_ASSET_ORIGIN =
+  "https://sm-landing-backend-falkomerr.dev.smartforel.com";
+
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "land.smartforel.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "sm-landing-backend-falkomerr.dev.smartforel.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "localhost",
+        port: "3001",
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "127.0.0.1",
+        port: "3001",
+        pathname: "/**",
+      },
+    ],
+  },
   async rewrites() {
     return [
       {
-        source: "/backend-api/:path*",
-        destination: "https://land.smartforel.com/api/:path*",
+        source: "/backend-assets/:path*",
+        destination: `${PRODUCTION_BACKEND_ASSET_ORIGIN}/:path*`,
       },
     ];
   },
