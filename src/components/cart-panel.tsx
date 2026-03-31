@@ -2,14 +2,25 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/button";
+import { QuantityControl } from "@/components/quantity-control";
 import { getOrderDetailsRoute } from "@/lib/app-routes";
-import { createOrder, validateCart, type CartSnapshotItem } from "@/lib/api";
+import {
+  createOrder,
+  resolveAssetUrl,
+  validateCart,
+  type CartSnapshotItem,
+} from "@/lib/api";
 import { useAppStore } from "@/lib/app-store";
 import {
   createOrderAddressDraft,
   hasRequiredOrderAddress,
   toOrderAddressPayload,
 } from "@/lib/order-draft";
+import {
+  ORDER_ACCEPTANCE_CLOSED_MESSAGE,
+  isOrderAcceptanceOpen,
+} from "@/lib/order-acceptance-window";
+import { canIncrementQuantity, formatQuantity } from "@/lib/product-units";
 
 export function CartPanel({ sticky = true }: { sticky?: boolean }) {
   const router = useRouter();
@@ -25,7 +36,11 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
   } = useAppStore();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const orderAddress = createOrderAddressDraft(orderDraft.address);
+  const orderAddress = createOrderAddressDraft(session?.user.address);
+  const orderAcceptanceOpen = isOrderAcceptanceOpen();
+  const orderAcceptanceMessage = orderAcceptanceOpen
+    ? null
+    : ORDER_ACCEPTANCE_CLOSED_MESSAGE;
 
   async function handleSubmit() {
     if (!session) {
@@ -43,7 +58,12 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
     }
 
     if (!hasRequiredOrderAddress(orderAddress)) {
-      setError("Укажите адрес доставки.");
+      setError("Укажите адрес доставки в настройках профиля.");
+      return;
+    }
+
+    if (!orderAcceptanceOpen) {
+      setError(ORDER_ACCEPTANCE_CLOSED_MESSAGE);
       return;
     }
 
@@ -118,6 +138,7 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
                   name: item.productName,
                   price: 0,
                   currency: "KGS",
+                  unit: item.unit,
                   quantity: item.quantityAvailable || item.quantity,
                   available: item.available,
                   picture: item.imageUrl,
@@ -150,94 +171,10 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
 
       <div className="space-y-3">
         <p className="text-sm font-semibold">Адрес доставки</p>
-
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Город</span>
-          <input
-            value={orderAddress.city}
-            onChange={(event) =>
-              updateDraft({
-                address: {
-                  ...orderAddress,
-                  city: event.target.value,
-                },
-              })
-            }
-            placeholder="Например, Бишкек"
-            className="input"
-          />
-        </label>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Улица</span>
-            <input
-              value={orderAddress.street}
-              onChange={(event) =>
-                updateDraft({
-                  address: {
-                    ...orderAddress,
-                    street: event.target.value,
-                  },
-                })
-              }
-              placeholder="Например, Манаса"
-              className="input"
-            />
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Дом</span>
-            <input
-              value={orderAddress.building}
-              onChange={(event) =>
-                updateDraft({
-                  address: {
-                    ...orderAddress,
-                    building: event.target.value,
-                  },
-                })
-              }
-              placeholder="Например, 50"
-              className="input"
-            />
-          </label>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Квартира</span>
-            <input
-              value={orderAddress.apartment}
-              onChange={(event) =>
-                updateDraft({
-                  address: {
-                    ...orderAddress,
-                    apartment: event.target.value,
-                  },
-                })
-              }
-              placeholder="Опционально"
-              className="input"
-            />
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Этаж</span>
-            <input
-              value={orderAddress.floor}
-              onChange={(event) =>
-                updateDraft({
-                  address: {
-                    ...orderAddress,
-                    floor: event.target.value,
-                  },
-                })
-              }
-              placeholder="Опционально"
-              className="input"
-            />
-          </label>
+        <div className="rounded-[1.5rem] border border-[var(--border)] bg-white px-4 py-4 text-sm leading-6 text-[var(--muted)]">
+          {hasRequiredOrderAddress(orderAddress)
+            ? formatAddressPreview(orderAddress)
+            : "Адрес доставки указывается в настройках профиля."}
         </div>
       </div>
 
@@ -257,8 +194,17 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
         </div>
       ) : null}
 
+      {orderAcceptanceMessage ? (
+        <div className="rounded-[1.25rem] bg-[#eef5ff] px-4 py-3 text-sm text-[#2563a6]">
+          {orderAcceptanceMessage}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-        <Button onClick={handleSubmit} disabled={!cart.length || isSubmitting}>
+        <Button
+          onClick={handleSubmit}
+          disabled={!cart.length || isSubmitting || !orderAcceptanceOpen}
+        >
           {isSubmitting ? "Отправка..." : "Отправить заявку"}
         </Button>
         <Button
@@ -273,6 +219,17 @@ export function CartPanel({ sticky = true }: { sticky?: boolean }) {
   );
 }
 
+function formatAddressPreview(address: ReturnType<typeof createOrderAddressDraft>) {
+  return [
+    address.city.trim(),
+    `${address.street.trim()} ${address.building.trim()}`.trim(),
+    address.apartment.trim() ? `кв. ${address.apartment.trim()}` : "",
+    address.floor.trim() ? `этаж ${address.floor.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 function CartRow({
   item,
   onIncrement,
@@ -282,16 +239,18 @@ function CartRow({
   onIncrement: () => void;
   onDecrement: () => void;
 }) {
+  const imageUrl = resolveAssetUrl(item.imageUrl);
+
   return (
     <div className="rounded-[1.5rem] bg-[var(--surface-muted)] p-4">
       <div className="flex items-center gap-3">
-        {item.imageUrl ? (
+        {imageUrl ? (
           <Image
-            src={item.imageUrl}
+            src={imageUrl}
             alt={item.productName}
             width={64}
             height={64}
-            unoptimized
+            sizes="64px"
             className="h-16 w-16 rounded-2xl object-cover"
           />
         ) : (
@@ -300,28 +259,25 @@ function CartRow({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{item.productName}</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {item.categoryName ?? "Поставка из общего каталога"}
+            {(item.categoryName ?? "Поставка из общего каталога")} ·{" "}
+            {formatQuantity(item.quantity, item.unit)}
           </p>
         </div>
       </div>
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
           Без цены
         </span>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" className="h-9 px-3" onClick={onDecrement}>
-            -
-          </Button>
-          <div className="min-w-10 rounded-full bg-white px-3 py-2 text-center text-sm font-semibold">
-            {item.quantity}
-          </div>
-          <Button
-            className="h-9 px-3"
-            onClick={onIncrement}
-            disabled={!item.available || item.quantity >= item.quantityAvailable}
-          >
-            +
-          </Button>
+        <div className="max-w-full self-stretch sm:self-auto">
+          <QuantityControl
+            disabled={!item.available}
+            incrementDisabled={!canIncrementQuantity(item.quantity, item.quantityAvailable, item.unit)}
+            onChange={() => undefined}
+            onDecrement={onDecrement}
+            onIncrement={onIncrement}
+            quantity={item.quantity}
+            unit={item.unit}
+          />
         </div>
       </div>
     </div>

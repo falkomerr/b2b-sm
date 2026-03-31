@@ -1,4 +1,5 @@
 import type { OrderAddress } from "@/lib/order-draft";
+import type { ProductUnit } from "@/lib/product-units";
 
 export type AccountType = "retail" | "b2b_company";
 
@@ -9,6 +10,7 @@ export type CurrentUser = {
   name?: string;
   username?: string;
   companyName?: string;
+  address?: OrderAddress | null;
   accountType: AccountType;
 };
 
@@ -28,6 +30,7 @@ export type Product = {
   name: string;
   price: number;
   currency: string;
+  unit: ProductUnit;
   description?: string;
   picture?: string;
   quantity: number;
@@ -44,6 +47,7 @@ export type CartLine = {
 export type CartSnapshotItem = {
   productId: string;
   productName: string;
+  unit: ProductUnit;
   imageUrl?: string;
   categoryName?: string;
   quantity: number;
@@ -58,10 +62,17 @@ export type CreateOrderPayload = {
   address?: OrderAddress;
 };
 
+export type UpdateOrderPayload = {
+  items: CartLine[];
+  orderedByFullName: string;
+  comments?: string;
+};
+
 export type OrderItem = {
   id: string;
   productId: string;
   productName: string;
+  unit: ProductUnit;
   quantity: number;
   price: number;
   imageUrl?: string;
@@ -132,7 +143,6 @@ function isLocalBrowserHost(browserHost?: string) {
 
 export function resolveApiBaseUrl({
   configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
-  browserHost = getBrowserLocation()?.hostname,
 }: ApiRuntimeOptions = {}) {
   const normalizedApiBaseUrl = configuredApiBaseUrl?.trim();
 
@@ -140,14 +150,10 @@ export function resolveApiBaseUrl({
     return normalizedApiBaseUrl;
   }
 
-  if (!isLocalBrowserHost(browserHost)) {
-    return PUBLIC_API_PROXY_PATH;
-  }
-
-  return LOCAL_API_BASE_URL;
+  return PUBLIC_API_PROXY_PATH;
 }
 
-function resolveBackendOrigin({
+function resolveDirectBackendOrigin({
   configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
   browserHost = getBrowserLocation()?.hostname,
   browserOrigin = getBrowserLocation()?.origin,
@@ -256,8 +262,8 @@ export function resolveAssetUrl(
 
     if (ALLOWED_ASSET_PROTOCOLS.has(absoluteUrl.protocol)) {
       if (
-        !isLocalBrowserHost(options?.browserHost ?? getBrowserLocation()?.hostname) &&
-        absoluteUrl.origin === resolveBackendOrigin(options)
+        !isLocalBrowserHost(options?.browserHost ?? getBrowserLocation()?.hostname)
+        && absoluteUrl.origin === resolveDirectBackendOrigin(options)
       ) {
         return toPublicAssetProxyPath(
           absoluteUrl.pathname,
@@ -303,7 +309,10 @@ export function normalizeAssetSource(source?: string | null) {
   return normalizeLegacyProductAssetPath(trimmedSource) ?? trimmedSource;
 }
 
-function extractErrorMessage(payload: unknown, fallback: string) {
+function extractErrorMessage(payload: unknown, fallback: string, status?: number) {
+  if (status === 429) {
+    return "Слишком много запросов. Подождите минуту и попробуйте снова.";
+  }
   if (!payload || typeof payload !== "object") {
     return fallback;
   }
@@ -328,6 +337,7 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
   accessToken?: string,
+  params?: URLSearchParams,
 ) {
   const headers = new Headers(options.headers);
 
@@ -338,7 +348,7 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const response = await fetch(resolveApiUrl(path), {
+  const response = await fetch(resolveApiUrl(path, params), {
     ...options,
     headers,
     credentials: "include",
@@ -350,7 +360,7 @@ async function request<T>(
 
   if (!response.ok) {
     throw new Error(
-      extractErrorMessage(payload, `Request failed with status ${response.status}`),
+      extractErrorMessage(payload, `Request failed with status ${response.status}`, response.status),
     );
   }
 
@@ -369,8 +379,13 @@ function mapCurrentUser(payload: CurrentUserPayload): CurrentUser {
     name: payload.name,
     username: payload.username,
     companyName: payload.companyName,
+    address: payload.address,
     accountType: payload.accountType,
   };
+}
+
+export function authPayloadToCurrentUser(payload: AuthPayload): CurrentUser {
+  return mapCurrentUser(payload);
 }
 
 export async function loginB2B(credentials: {
@@ -405,6 +420,7 @@ export async function updateCurrentUser(
   payload: {
     name?: string;
     phone?: string;
+    address?: OrderAddress | null;
   },
 ) {
   return request<CurrentUserPayload>(
@@ -421,6 +437,7 @@ export async function getProducts(filters: {
   search?: string;
   category?: string;
   availableOnly?: boolean;
+  b2bFeaturedFirst?: boolean;
 }) {
   const params = new URLSearchParams();
   if (filters.search) {
@@ -432,7 +449,10 @@ export async function getProducts(filters: {
   if (filters.availableOnly) {
     params.set("available", "true");
   }
-  return request<Product[]>("products", {}, undefined).then((products) => {
+  if (filters.b2bFeaturedFirst) {
+    params.set("b2bFeaturedFirst", "true");
+  }
+  return request<Product[]>("products", {}, undefined, params).then((products) => {
     return products.filter((product) => {
       if (filters.search) {
         const term = filters.search.toLowerCase();
@@ -476,4 +496,23 @@ export async function createOrder(payload: CreateOrderPayload, accessToken: stri
 
 export async function getOrders(accessToken: string) {
   return request<Order[]>("orders", {}, accessToken);
+}
+
+export async function getOrderById(orderId: string, accessToken: string) {
+  return request<Order>(`orders/${encodeURIComponent(orderId)}`, {}, accessToken);
+}
+
+export async function updateOrder(
+  orderId: string,
+  payload: UpdateOrderPayload,
+  accessToken: string,
+) {
+  return request<Order>(
+    `orders/${encodeURIComponent(orderId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    accessToken,
+  );
 }

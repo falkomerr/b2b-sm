@@ -114,7 +114,6 @@ describe("selectHomeProducts", () => {
       "unavailable-with-image",
     ]);
   });
-
   test("returns an empty list when limit is zero", () => {
     const products = [
       {

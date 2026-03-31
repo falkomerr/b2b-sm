@@ -1,8 +1,22 @@
-import { describe, expect, test } from "bun:test";
-import { normalizeAssetSource, resolveApiBaseUrl, resolveAssetUrl } from "./api.ts";
+import { afterEach, describe, expect, test } from "bun:test";
+import {
+  authPayloadToCurrentUser,
+  getOrderById,
+  getProducts,
+  loginB2B,
+  normalizeAssetSource,
+  resolveApiBaseUrl,
+  resolveAssetUrl,
+  updateOrder,
+} from "./api.ts";
 
 const DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0W8AAAAASUVORK5CYII=";
+const realFetch = globalThis.fetch;
+
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
 
 describe("resolveAssetUrl", () => {
   test("drops inline data URLs", () => {
@@ -44,25 +58,19 @@ describe("normalizeAssetSource", () => {
 });
 
 describe("resolveApiBaseUrl", () => {
-  test("keeps local backend for localhost", () => {
-    expect(resolveApiBaseUrl({ browserHost: "localhost" })).toBe(
-      "http://localhost:3001/api",
-    );
-    expect(resolveApiBaseUrl({ browserHost: "127.0.0.1" })).toBe(
-      "http://localhost:3001/api",
-    );
+  test("uses same-origin proxy on localhost", () => {
+    expect(resolveApiBaseUrl({ browserHost: "localhost" })).toBe("/backend-api");
+    expect(resolveApiBaseUrl({ browserHost: "127.0.0.1" })).toBe("/backend-api");
   });
 
   test("uses same-origin proxy on public hosts", () => {
-    expect(resolveApiBaseUrl({ browserHost: "b2b.smartforel.com" })).toBe(
-      "/backend-api",
-    );
+    expect(resolveApiBaseUrl({ browserHost: "b2b.smartforel.com" })).toBe("/backend-api");
   });
 
   test("prefers explicit api base URL", () => {
     expect(
       resolveApiBaseUrl({
-        browserHost: "b2b.smartforel.com",
+        browserHost: "localhost",
         configuredApiBaseUrl: "https://api.example.com/v1",
       }),
     ).toBe("https://api.example.com/v1");
@@ -84,5 +92,194 @@ describe("resolveAssetUrl on public hosts", () => {
         browserHost: "b2b.smartforel.com",
       }),
     ).toBe("/backend-assets/static/products/item.webp");
+  });
+});
+
+describe("getProducts", () => {
+  test("forwards catalog filters to query string including B2B featured mode", async () => {
+    const fetchCalls = [];
+    globalThis.fetch = async (...args) => {
+      fetchCalls.push(args);
+      return new Response(JSON.stringify({ success: true, data: [] }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+    };
+
+    await getProducts({
+      search: "форель",
+      category: "cat-1",
+      availableOnly: true,
+      b2bFeaturedFirst: true,
+    });
+
+    expect(fetchCalls).toHaveLength(1);
+    const url = new URL(fetchCalls[0][0].toString(), "https://b2b.smartforel.com");
+
+    expect(url.pathname).toBe("/backend-api/products");
+    expect(url.searchParams.get("search")).toBe("форель");
+    expect(url.searchParams.get("category")).toBe("cat-1");
+    expect(url.searchParams.get("available")).toBe("true");
+    expect(url.searchParams.get("b2bFeaturedFirst")).toBe("true");
+  });
+});
+
+describe("authPayloadToCurrentUser", () => {
+  test("maps b2b login response into the session user shape", () => {
+    expect(
+      authPayloadToCurrentUser({
+        accessToken: "token",
+        userId: "user-42",
+        username: "acme",
+        email: "buyer@example.com",
+        companyName: "Acme LLC",
+        accountType: "b2b_company",
+        name: "Иван Иванов",
+        phone: "+996700000000",
+        address: {
+          settlement: "Бишкек",
+          street: "Логвиненко",
+          house: "55",
+          apartment: "12",
+          entrance: "2",
+          floor: "3",
+          comment: "Офис",
+        },
+      }),
+    ).toEqual({
+      userId: "user-42",
+      username: "acme",
+      email: "buyer@example.com",
+      companyName: "Acme LLC",
+      accountType: "b2b_company",
+      name: "Иван Иванов",
+      phone: "+996700000000",
+      address: {
+        settlement: "Бишкек",
+        street: "Логвиненко",
+        house: "55",
+        apartment: "12",
+        entrance: "2",
+        floor: "3",
+        comment: "Офис",
+      },
+    });
+  });
+});
+
+describe("loginB2B", () => {
+  test("maps throttling responses to a user-friendly message", async () => {
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          success: false,
+          message: "ThrottlerException: Too Many Requests",
+          statusCode: 429,
+        }),
+        {
+          status: 429,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      );
+
+    await expect(
+      loginB2B({
+        login: "acme",
+        password: "secret",
+      }),
+    ).rejects.toThrow("Слишком много запросов. Подождите минуту и попробуйте снова.");
+  });
+});
+
+describe("order api helpers", () => {
+  test("loads a single order by id", async () => {
+    globalThis.fetch = async (url, options) => {
+      expect(url).toBe("/backend-api/orders/order-42");
+      expect(options?.method).toBeUndefined();
+      expect(options?.headers?.get("Authorization")).toBe("Bearer token");
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            id: "order-42",
+            price: 0,
+            currency: "KGS",
+            statusId: "N",
+            dateInsert: "2026-03-20T00:00:00.000Z",
+            items: [],
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      );
+    };
+
+    await expect(getOrderById("order-42", "token")).resolves.toEqual(
+      expect.objectContaining({
+        id: "order-42",
+        statusId: "N",
+      }),
+    );
+  });
+
+  test("updates an order with put payload", async () => {
+    globalThis.fetch = async (url, options) => {
+      expect(url).toBe("/backend-api/orders/order-42");
+      expect(options?.method).toBe("PUT");
+      expect(options?.headers?.get("Authorization")).toBe("Bearer token");
+      expect(JSON.parse(String(options?.body))).toEqual({
+        items: [{ productId: "product-1", quantity: 2 }],
+        orderedByFullName: "Иван Иванов",
+        comments: "Без звонка",
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            id: "order-42",
+            price: 0,
+            currency: "KGS",
+            statusId: "P",
+            dateInsert: "2026-03-20T00:00:00.000Z",
+            items: [],
+            comments: "Без звонка",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      );
+    };
+
+    await expect(
+      updateOrder(
+        "order-42",
+        {
+          items: [{ productId: "product-1", quantity: 2 }],
+          orderedByFullName: "Иван Иванов",
+          comments: "Без звонка",
+        },
+        "token",
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: "order-42",
+        statusId: "P",
+        comments: "Без звонка",
+      }),
+    );
   });
 });

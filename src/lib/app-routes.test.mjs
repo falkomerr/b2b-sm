@@ -1,18 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { appRoutes, getOrderDetailsRoute, primaryNavigation } from "./app-routes.ts";
+import { appRoutes, getOrderDetailsRoute } from "./app-routes.ts";
 
 describe("appRoutes", () => {
   test("exposes home route at root", () => {
     expect(appRoutes.home).toBe("/");
   });
 
-  test("uses a dedicated cart page in primary navigation", () => {
+  test("does not expose deprecated catalog route", () => {
+    expect("catalog" in appRoutes).toBe(false);
+  });
+
+  test("keeps a dedicated cart page", () => {
     expect(appRoutes.cart).toBe("/cart");
-    expect(primaryNavigation).toContainEqual({
-      href: appRoutes.cart,
-      label: "Корзина",
-    });
-    expect(primaryNavigation.every((item) => !item.href.includes("#cart"))).toBe(true);
   });
 
   test("builds dedicated order details routes", () => {
