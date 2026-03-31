@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createOrderAddressDraft,
   hasRequiredOrderAddress,
+  isEmptyOrderAddress,
   toOrderAddressPayload,
 } from "./order-draft.ts";
 
@@ -37,6 +38,17 @@ describe("order draft helpers", () => {
         createOrderAddressDraft({
           street: "Манаса",
           city: "Бишкек",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  test("detects whether the draft address is empty", () => {
+    expect(isEmptyOrderAddress(createOrderAddressDraft())).toBe(true);
+    expect(
+      isEmptyOrderAddress(
+        createOrderAddressDraft({
+          street: "Манаса",
         }),
       ),
     ).toBe(false);
