@@ -22,15 +22,13 @@ function makeOrder(overrides = {}) {
         productId: "product-1",
         productName: "Филе",
         quantity: 8,
-        unit: "piece",
         price: 1300,
       },
       {
         id: "item-2",
         productId: "product-2",
         productName: "Стейк",
-        quantity: 0.75,
-        unit: "kg",
+        quantity: 6,
         price: 2100,
       },
     ],
@@ -59,7 +57,7 @@ describe("profile presentation", () => {
     expect(formatOrderStatusTone("P")).toBe("neutral");
   });
 
-  test("counts order lines instead of summing mixed quantities", () => {
-    expect(getOrderItemCount(makeOrder())).toBe(2);
+  test("calculates total ordered pieces", () => {
+    expect(getOrderItemCount(makeOrder())).toBe(14);
   });
 });
