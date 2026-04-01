@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
-const PRODUCTION_BACKEND_ASSET_ORIGIN =
-  "https://sm-landing-backend-falkomerr.dev.smartforel.com";
+const PRODUCTION_BACKEND_ASSET_ORIGIN = "https://land.smartforel.com";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
@@ -10,11 +9,6 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "land.smartforel.com",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "sm-landing-backend-falkomerr.dev.smartforel.com",
         pathname: "/**",
       },
       {
