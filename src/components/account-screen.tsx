@@ -6,13 +6,7 @@ import { useRouter } from "next/navigation";
 import { MobileAppFrame } from "@/components/mobile-app-frame";
 import { appRoutes, getOrderDetailsRoute } from "@/lib/app-routes";
 import { getOrders, type Order } from "@/lib/api";
-import { resolveOrderedByFullName, useAppStore } from "@/lib/app-store";
-import {
-  createOrderAddressDraft,
-  hasRequiredOrderAddress,
-  isEmptyOrderAddress,
-  type OrderAddressDraft,
-} from "@/lib/order-draft";
+import { useAppStore } from "@/lib/app-store";
 import {
   formatOrderDateTime,
   formatOrderMoney,
@@ -22,11 +16,6 @@ import {
 } from "@/lib/profile-presentation";
 
 type AccountTab = "profile" | "orders";
-type ProfileFormState = {
-  orderedByFullName: string;
-  phone: string;
-  address: OrderAddressDraft;
-};
 
 export function AccountScreen({ initialTab }: { initialTab: AccountTab }) {
   const router = useRouter();
@@ -34,10 +23,9 @@ export function AccountScreen({ initialTab }: { initialTab: AccountTab }) {
   const [orders, setOrders] = useState<Order[]>(() => recentOrders);
   const [loading, setLoading] = useState(initialTab === "orders");
   const [error, setError] = useState<string | null>(null);
-  const [profileForm, setProfileForm] = useState<ProfileFormState>({
+  const [profileForm, setProfileForm] = useState({
     orderedByFullName: "",
     phone: "",
-    address: createOrderAddressDraft(),
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -97,12 +85,8 @@ export function AccountScreen({ initialTab }: { initialTab: AccountTab }) {
     }
 
     setProfileForm({
-      orderedByFullName: resolveOrderedByFullName(
-        orderDraft.orderedByFullName,
-        session.user,
-      ),
+      orderedByFullName: orderDraft.orderedByFullName || session.user.name || "",
       phone: session.user.phone || "",
-      address: createOrderAddressDraft(session.user.address),
     });
   }, [orderDraft.orderedByFullName, session]);
 
@@ -116,27 +100,15 @@ export function AccountScreen({ initialTab }: { initialTab: AccountTab }) {
     );
   }
 
-  const initialProfileName = resolveOrderedByFullName("", session.user);
+  const initialProfileName =
+    orderDraft.orderedByFullName.trim() || session.user.name?.trim() || "";
   const initialProfilePhone = session.user.phone?.trim() || "";
-  const initialProfileAddress = createOrderAddressDraft(session.user.address);
   const isProfileDirty =
     profileForm.orderedByFullName.trim() !== initialProfileName ||
-    profileForm.phone.trim() !== initialProfilePhone ||
-    !areAddressDraftsEqual(profileForm.address, initialProfileAddress);
+    profileForm.phone.trim() !== initialProfilePhone;
 
   async function handleProfileSubmit() {
     if (!session || !isProfileDirty) {
-      return;
-    }
-
-    const normalizedAddress = createOrderAddressDraft(profileForm.address);
-
-    if (
-      !isEmptyOrderAddress(normalizedAddress)
-      && !hasRequiredOrderAddress(normalizedAddress)
-    ) {
-      setProfileError("Для адреса доставки заполните город, улицу и дом.");
-      setProfileSuccess(null);
       return;
     }
 
@@ -148,9 +120,8 @@ export function AccountScreen({ initialTab }: { initialTab: AccountTab }) {
       await saveProfile({
         name: profileForm.orderedByFullName.trim(),
         phone: profileForm.phone.trim(),
-        address: isEmptyOrderAddress(normalizedAddress) ? null : normalizedAddress,
       });
-      setProfileSuccess("Настройки обновлены.");
+      setProfileSuccess("Профиль обновлен.");
     } catch (saveError) {
       setProfileError(
         saveError instanceof Error ? saveError.message : "Не удалось сохранить профиль.",
@@ -236,12 +207,11 @@ function ProfileFormCard({
   form: {
     orderedByFullName: string;
     phone: string;
-    address: OrderAddressDraft;
   };
   isDirty: boolean;
   isSaving: boolean;
   success: string | null;
-  onChange: (patch: Partial<ProfileFormState>) => void;
+  onChange: (patch: Partial<{ orderedByFullName: string; phone: string }>) => void;
   onSubmit: () => void;
 }) {
   return (
@@ -283,118 +253,6 @@ function ProfileFormCard({
             className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-[#ececec] px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
           />
         </label>
-
-        <div className="rounded-[22px] bg-[#f5f6fa] px-4 py-4">
-          <div>
-            <p className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-              Адрес доставки
-            </p>
-            <p className="mt-1 text-[12px] leading-4 tracking-[-0.08px] text-[#8e8e93]">
-              Этот адрес будет автоматически подставляться при оформлении новых заказов.
-            </p>
-          </div>
-
-          <div className="mt-4 grid gap-3">
-            <label className="block">
-              <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                Город
-              </span>
-              <input
-                value={form.address.city}
-                onChange={(event) =>
-                  onChange({
-                    address: {
-                      ...form.address,
-                      city: event.target.value,
-                    },
-                  })
-                }
-                placeholder="Например, Бишкек"
-                className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-              />
-            </label>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                  Улица
-                </span>
-                <input
-                  value={form.address.street}
-                  onChange={(event) =>
-                    onChange({
-                      address: {
-                        ...form.address,
-                        street: event.target.value,
-                      },
-                    })
-                  }
-                  placeholder="Например, Манаса"
-                  className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                  Дом
-                </span>
-                <input
-                  value={form.address.building}
-                  onChange={(event) =>
-                    onChange({
-                      address: {
-                        ...form.address,
-                        building: event.target.value,
-                      },
-                    })
-                  }
-                  placeholder="Например, 50"
-                  className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                  Квартира
-                </span>
-                <input
-                  value={form.address.apartment}
-                  onChange={(event) =>
-                    onChange({
-                      address: {
-                        ...form.address,
-                        apartment: event.target.value,
-                      },
-                    })
-                  }
-                  placeholder="Опционально"
-                  className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-[13px] leading-[18px] font-semibold tracking-[-0.08px] text-[#1a1a1f]">
-                  Этаж
-                </span>
-                <input
-                  value={form.address.floor}
-                  onChange={(event) =>
-                    onChange({
-                      address: {
-                        ...form.address,
-                        floor: event.target.value,
-                      },
-                    })
-                  }
-                  placeholder="Опционально"
-                  className="mt-2 h-[50px] w-full rounded-[18px] border border-[#ececf2] bg-white px-4 text-[15px] leading-5 tracking-[-0.23px] text-[#121212] outline-none transition focus:border-[#1688ff] focus:ring-4 focus:ring-[#1688ff]/10"
-                />
-              </label>
-            </div>
-          </div>
-        </div>
       </div>
 
       {error ? (
@@ -418,16 +276,6 @@ function ProfileFormCard({
         {isSaving ? "Сохраняю..." : "Сохранить"}
       </button>
     </div>
-  );
-}
-
-function areAddressDraftsEqual(left: OrderAddressDraft, right: OrderAddressDraft) {
-  return (
-    left.city === right.city
-    && left.street === right.street
-    && left.building === right.building
-    && left.apartment === right.apartment
-    && left.floor === right.floor
   );
 }
 
@@ -462,7 +310,7 @@ function SegmentedControl({
             : "font-medium text-[#121212]",
         ].join(" ")}
       >
-        История
+        История заказов
       </button>
     </div>
   );
@@ -514,7 +362,7 @@ function OrderHistoryCard({ order }: { order: Order }) {
             {formatOrderDateTime(order.dateInsert)}
           </p>
           <p className="mt-0.5 text-[12px] leading-4 text-[#8e8e93]">
-            Кол-во позиций: {getOrderItemCount(order)}
+            Кол-во позиций: {getOrderItemCount(order)} шт.
           </p>
         </div>
 

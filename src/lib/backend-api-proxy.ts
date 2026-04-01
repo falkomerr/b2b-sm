@@ -1,8 +1,3 @@
-import {
-  ORDER_ACCEPTANCE_CLOSED_MESSAGE,
-  isOrderAcceptanceOpen,
-} from "@/lib/order-acceptance-window";
-
 const BACKEND_API_ORIGIN = "https://land.smartforel.com";
 
 const REQUEST_HEADERS_TO_DROP = new Set([
@@ -67,31 +62,4 @@ export function createBackendApiResponseHeaders(source: Headers) {
   });
 
   return headers;
-}
-
-export function createOrderAcceptanceGuardResponse(
-  method: string,
-  path: string[] | undefined,
-  now = new Date(),
-) {
-  if (method.toUpperCase() !== "POST" || path?.length !== 1 || path[0] !== "orders") {
-    return undefined;
-  }
-
-  if (isOrderAcceptanceOpen(now)) {
-    return undefined;
-  }
-
-  return new Response(
-    JSON.stringify({
-      success: false,
-      message: ORDER_ACCEPTANCE_CLOSED_MESSAGE,
-    }),
-    {
-      status: 403,
-      headers: {
-        "content-type": "application/json; charset=utf-8",
-      },
-    },
-  );
 }
