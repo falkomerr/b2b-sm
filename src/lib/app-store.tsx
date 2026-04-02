@@ -503,7 +503,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
     const timeoutId = window.setTimeout(() => {
       expireSessionRef.current();
-    }, Math.max(sessionExpiresAt - Date.now(), 0));
+    }, Math.min(Math.max(sessionExpiresAt - Date.now(), 0), 2_147_483_647));
 
     return () => {
       window.clearTimeout(timeoutId);
