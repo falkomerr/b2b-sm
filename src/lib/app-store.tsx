@@ -472,7 +472,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setHydrated(true);
 
       if (restored.state.session?.accessToken) {
-        void getCurrentUser(restored.state.session.accessToken)
+        const accessTokenToValidate = restored.state.session.accessToken;
+
+        void getCurrentUser(accessTokenToValidate)
           .then((user) => {
             setSession((current) => {
               const nextSession = current ?? restored.state.session;
@@ -485,7 +487,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             });
           })
           .catch(() => {
-            setSession(null);
+            setSession((current) => {
+              if (current?.accessToken !== accessTokenToValidate) {
+                return current;
+              }
+              return null;
+            });
           });
         return;
       }
