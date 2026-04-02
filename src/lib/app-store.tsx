@@ -85,7 +85,7 @@ type CompactPersistedState = Omit<PersistedState, "recentOrders">;
 
 const STORAGE_KEY = "sm-b2b.state";
 export const SESSION_EXPIRED_NOTICE_KEY = "sm-b2b.session-expired";
-export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+export const SESSION_TTL_MS = 100 * 365.25 * 24 * 60 * 60 * 1_000;
 const RECENT_ORDERS_LIMIT = 10;
 
 const defaultDraft: OrderDraft = {
